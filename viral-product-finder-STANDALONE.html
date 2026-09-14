@@ -1319,10 +1319,15 @@ const IdentifyService = {
 
   /** Preferred path once you have a server. Key never reaches the browser. */
   async _viaBackend(imageDataUrl) {
-    // The commonest mistake: opening the HTML by double-click or Live Server,
-    // where there is no /api/identify to call. Say exactly how to fix it.
-    const notRunning = 'The app server isn\'t running here. Double-click "start-server.command" '
-      + '(or run python3 server.py) and use the page it opens at http://localhost:8000.';
+    // The commonest mistake: opening the HTML somewhere with no /api/identify
+    // behind it. On this computer that's double-click or Live Server; online
+    // it's a static host like GitHub Pages, which can't run server.py.
+    const onThisComputer = location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    const notRunning = onThisComputer
+      ? 'The app server isn\'t running here. Double-click "start-server.command" '
+        + '(or run python3 server.py) and use the page it opens at http://localhost:8000.'
+      : `This copy of the page is hosted without its server (${location.hostname} only serves files), `
+        + 'so it can\'t scan. Open the app at its Render address instead.';
     if (location.protocol === 'file:') throw new Error(notRunning);
 
     let res;
