@@ -3,26 +3,24 @@
 **Snap it. Scan it. Buy it.** — Upload a photo from your phone or computer (or take one
 with the camera) and AI identifies the product and finds places to buy it.
 
-## Photos only — no links
+## Photos and links
 
-The app takes **images only**. There is no URL/link input anywhere, by design: a web page
-cannot fetch or read a third-party video page (TikTok, Instagram, YouTube all block it),
-so pasting a link could never produce a genuine result. The only honest input is an image
-the user supplies from their own device.
+**A photo:** take one (phones open the native camera, desktop opens an in-page viewfinder),
+choose one from the device, drag and drop, or paste with Cmd/Ctrl+V. `ImageIntake` redraws
+every photo at 1280px max as JPEG before sending, which is what makes 12MP phone shots usable.
 
-Four ways to hand it a photo, all wired up:
+**A link:** paste it under *Or paste a link*. A browser can't read other websites, so
+`server.py` visits the link and takes one image:
 
-| Way | How it works |
+| Link | Image used |
 | --- | --- |
-| **Take a photo** | On phones, opens the native camera app (`<input capture="environment">`) — reliable, correctly rotated, works without https. On desktop, opens an in-page live viewfinder via `getUserMedia`, with a front/back flip button. |
-| **Choose from device** | The gallery / file picker. |
-| **Drag and drop** | Drop an image anywhere on the dropzone. |
-| **Paste** | Cmd+V / Ctrl+V an image from the clipboard. |
+| YouTube, Shorts | the video's cover image |
+| TikTok | the video's cover image, from TikTok's public oEmbed |
+| Shop or product page | the page's preview image (`og:image`); its title is passed to the AI as a hint |
+| Direct image link | the image itself (JPG, PNG, WEBP) |
 
-Every path funnels through `ImageIntake`, which decodes the file (honoring EXIF rotation),
-redraws it on a canvas capped at 1280px on the longest side, and re-encodes it as JPEG,
-stepping quality down until the payload is under 4MB. That is what makes phone photos
-work — a raw 12MP shot is far too big to base64 into an API request.
+Only a video's **cover** is seen, not the video. Instagram, Facebook and some shops (often
+Amazon) block automatic visits; the app says so and suggests a screenshot.
 
 ## Running it
 
@@ -51,6 +49,7 @@ behind those — and the page says so. Use http://localhost:8000.
 | Rate limits | Per visitor: 6 scans/minute, 60/day. Whole site: 1,000/day, under Gemini's free quota. Change with `RATE_PER_MINUTE`, `RATE_PER_DAY`, `GLOBAL_PER_DAY`. |
 | Size and type checks | JPG, PNG or WEBP only, 6MB maximum. Links are refused. |
 | Busy-model fallback | On Google's 503/429, retries, drops JSON mode, then moves to the next-best model. |
+| Link safety | Only public http(s) sites on ports 80/443. Private and internal addresses, and redirects to them, are refused. The rate limit is checked before a link is visited, so the server isn't a free fetching proxy. |
 
 Limits are kept in memory and reset when the server restarts.
 

@@ -182,6 +182,38 @@
   .scan-panel .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
   .upload-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
   .upload-actions .camera-btn{margin-top:0;}
+
+  /* ===== Paste a link ===== */
+  .link-form{
+    margin-top:12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-md);padding:14px 16px;
+  }
+  .link-form label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text-dim);margin-bottom:10px;}
+  .link-form label svg{width:15px;height:15px;color:var(--cyan);}
+  .link-row{display:flex;gap:8px;}
+  .link-row input{
+    flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+    color:var(--text);font-family:var(--font-body);font-size:16px;padding:11px 13px;
+  }
+  .link-row input::placeholder{color:var(--text-faint);}
+  .link-row input:focus{outline:none;border-color:var(--cyan);}
+  .link-btn{
+    flex:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:10px;
+    background:var(--surface-3);color:var(--text);font-weight:700;font-size:14px;padding:0 16px;
+  }
+  .link-btn:hover{background:var(--border);}
+  .link-btn svg{width:15px;height:15px;}
+  .link-form .link-note{font-size:11.5px;color:var(--text-faint);margin-top:8px;line-height:1.45;}
+  @media (max-width:520px){
+    .link-row{flex-direction:column;}
+    .link-btn{padding:12px;}
+  }
+  .source-note{
+    display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:#ffb73d;
+    background:rgba(255,183,61,0.06);border:1px solid rgba(255,183,61,0.28);
+    border-radius:10px;padding:10px 12px;margin:-4px 0 18px;
+  }
+  .source-note svg{width:14px;height:14px;flex:none;margin-top:2px;}
   @media (max-width:520px){
     .upload-actions{grid-template-columns:1fr;}
   }
@@ -1103,6 +1135,25 @@ function scoreGeminiModel(name) {
   return score;
 }
 
+/**
+ * Accepts what people actually paste ("tiktok.com/@x/video/1", stray spaces)
+ * and returns a full http(s) URL, or '' when it isn't a link.
+ */
+function normalizeLink(text) {
+  let link = String(text || '').trim();
+  if (!link) return '';
+  if (!/^https?:\/\//i.test(link)) {
+    if (!/^[\w-]+(\.[\w-]+)+(\/|$)/.test(link)) return '';
+    link = 'https://' + link;
+  }
+  try {
+    const url = new URL(link);
+    return /^https?:$/.test(url.protocol) && url.hostname.includes('.') ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
 const IS_MOBILE =
   /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
   (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform));
@@ -1268,6 +1319,14 @@ const IDENTIFY_STEPS = [
   { label: 'Product found!',                  sub: 'Preparing your results' },
 ];
 
+const LINK_STEPS = [
+  { label: 'Opening your link…',          sub: 'The server visits the page for you' },
+  { label: 'Finding the image…',          sub: 'Video cover, preview image or the photo itself' },
+  { label: 'Identifying the best match…', sub: 'Asking the vision model' },
+  { label: 'Finding places to buy it…',   sub: 'Building live search links' },
+  { label: 'Product found!',              sub: 'Preparing your results' },
+];
+
 const IdentifyService = {
   steps: IDENTIFY_STEPS,
 
@@ -1300,6 +1359,11 @@ const IdentifyService = {
     onStep(4, total, IDENTIFY_STEPS[4]);
     await sleep(350);
 
+    return this._normalize(parsed, photo.dataUrl);
+  },
+
+  /** One shape for every result, whether the image came from a photo or a link. */
+  _normalize(parsed, image) {
     return {
       id: 'live-' + Date.now(),
       name: parsed.name,
@@ -1313,12 +1377,55 @@ const IdentifyService = {
       notSureAbout: parsed.notSureAbout || '',
       brand: GENERIC_BRANDS.test(String(parsed.brand || '')) ? '' : (parsed.brand || ''),
       searchQuery: buildSearchQuery(parsed),
-      image: photo.dataUrl,
+      image,
     };
+  },
+
+  /**
+   * Identify from a pasted link. The server visits the link and picks the
+   * image; this page never touches the other website.
+   */
+  async identifyLink(url, onStep) {
+    const total = LINK_STEPS.length;
+    onStep(0, total, LINK_STEPS[0]);
+
+    // Start the request now; step through the progress UI while it runs.
+    const settled = this._postBackend({ url }).then(value => ({ value }), error => ({ error }));
+    await sleep(700);
+    onStep(1, total, LINK_STEPS[1]);
+    await sleep(700);
+    onStep(2, total, LINK_STEPS[2]);
+    const result = await settled;
+    if (result.error) throw result.error;
+
+    onStep(3, total, LINK_STEPS[3]);
+    await sleep(300);
+
+    const parsed = result.value;
+    const source = (parsed && parsed.source) || {};
+    if (!parsed || !parsed.name) {
+      throw new Error((parsed && parsed.description) || (source.kind === 'video-cover'
+        ? "We could see the video's cover image, but not a clear product on it. Take a screenshot of the moment the product appears and upload that."
+        : "We could see the image behind that link, but not a clear product in it. Try a screenshot instead."));
+    }
+
+    onStep(4, total, LINK_STEPS[4]);
+    await sleep(350);
+
+    const image = /^data:image\/(jpeg|png|webp);base64,/.test(source.image || '') ? source.image : '';
+    const product = this._normalize(parsed, image);
+    product.source = { kind: String(source.kind || ''), host: String(source.host || ''), title: String(source.title || ''), link: url };
+    return product;
   },
 
   /** Preferred path once you have a server. Key never reaches the browser. */
   async _viaBackend(imageDataUrl) {
+    const data = await this._postBackend({ image: imageDataUrl });
+    return typeof data === 'string' ? data : JSON.stringify(data);
+  },
+
+  /** POST to server.py; returns its JSON or throws an Error a person can act on. */
+  async _postBackend(payload) {
     // The commonest mistake: opening the HTML somewhere with no /api/identify
     // behind it. On this computer that's double-click or Live Server; online
     // it's a static host like GitHub Pages, which can't run server.py.
@@ -1335,7 +1442,7 @@ const IdentifyService = {
       res = await fetch(CONFIG.backendEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageDataUrl }),
+        body: JSON.stringify(payload),
       });
     } catch {
       throw new Error('Could not reach the server. Check your connection and try again.');
@@ -1349,7 +1456,7 @@ const IdentifyService = {
       throw new Error((data && data.error) || `The server returned an error (status ${res.status}). Please try again.`);
     }
     if (!data) throw new Error('The server sent back something unreadable. Please try again.');
-    return typeof data === 'string' ? data : JSON.stringify(data);
+    return data;
   },
 
   /** Demo/testing path: visitor's own key, direct from the browser. */
@@ -1878,6 +1985,7 @@ const ICON_CLOSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_KEY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.5 12.5L20 3M17 6l2 2M14 9l2 2"/></svg>`;
 const ICON_CAMERA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 012-2h2.5l1.2-2h6.6l1.2 2H20a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/><circle cx="12" cy="12.5" r="3.5"/></svg>`;
 const ICON_FLIP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 0113.5-3.5L20 8"/><path d="M20 4v4h-4"/><path d="M20 15a8 8 0 01-13.5 3.5L4 16"/><path d="M4 20v-4h4"/></svg>`;
+const ICON_LINK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.5.5l2-2a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.5-.5l-2 2a5 5 0 007 7l1.5-1.5"/></svg>`;
 const ICON_SEARCH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>`;
 const ICON_IMAGE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-9 9"/></svg>`;
 
@@ -1894,6 +2002,7 @@ const State = {
   photo: null,        // { dataUrl, name, width, height, bytes }
   product: null,
   cameraStream: null,
+  lastLink: '',       // kept so "Try again" after a failed link scan doesn't lose it
 };
 
 function stopCameraStream() {
@@ -1928,7 +2037,7 @@ function renderHome() {
           <div class="scan-panel">
             <div class="panel-head">
               <span class="mode-tag real">${ICON_CHECK} Real AI identification</span>
-              <span class="mode-tag real" style="background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.3);color:var(--violet);">${ICON_IMAGE} Photos only — no links</span>
+              <span class="mode-tag real" style="background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.3);color:var(--violet);">${ICON_LINK} Photos or links</span>
             </div>
 
             <!-- Kept OUTSIDE .dropzone on purpose: input.click() bubbles, and a
@@ -1946,6 +2055,15 @@ function renderHome() {
               <button class="camera-btn" id="cameraBtn" type="button">${ICON_CAMERA} Take a photo</button>
               <button class="camera-btn" id="galleryBtn" type="button">${ICON_IMAGE} Choose from device</button>
             </div>
+
+            <form class="link-form" id="linkForm" novalidate>
+              <label for="linkInput">${ICON_LINK} Or paste a link</label>
+              <div class="link-row">
+                <input id="linkInput" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="TikTok, YouTube, a shop page or an image link" />
+                <button type="submit" class="link-btn" id="linkBtn">${ICON_SCAN} Scan link</button>
+              </div>
+              <p class="link-note">From a video we can only see its cover image. If the product isn't on the cover, a screenshot works better.</p>
+            </form>
 
             <div class="camera-stage" id="cameraStage">
               <video id="cameraVideo" playsinline autoplay muted></video>
@@ -2558,6 +2676,32 @@ function bindHomeEvents() {
     startScan(State.photo, key);
   });
 
+  /* ----- paste a link ----- */
+  const linkForm = $('linkForm');
+  const linkInput = $('linkInput');
+  if (State.lastLink) linkInput.value = State.lastLink;
+
+  linkForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const link = normalizeLink(linkInput.value);
+    if (!link) {
+      showError("That isn't a link. Paste the full address, like https://www.tiktok.com/@shop/video/…");
+      linkInput.focus();
+      return;
+    }
+    if (!usingBackend) {
+      showError('Scanning a link needs the app server. Open the app at its Render address.');
+      return;
+    }
+    if (!SubscriptionService.canScan()) {
+      openUpgradeModal('pro', currentBilling(), true);
+      return;
+    }
+    clearError();
+    State.lastLink = link;
+    startLinkScan(link);
+  });
+
   /* ----- nav CTAs ----- */
   function focusScanner() {
     document.getElementById('top')?.scrollIntoView({ behavior: 'smooth' });
@@ -2584,7 +2728,7 @@ function bindHomeEvents() {
 /* =========================================================================
    11. SCAN FLOW + REMAINING VIEWS
    ========================================================================= */
-function renderScanning() {
+function renderScanning(steps = IdentifyService.steps) {
   setView('scanning', `
     <section class="scan-view">
       <div class="wrap scan-stage fade-in">
@@ -2593,11 +2737,11 @@ function renderScanning() {
           <div class="ring2"></div>
           <div class="core">${ICON_SCAN}</div>
         </div>
-        <div class="scan-status" id="scanStatus">${IdentifyService.steps[0].label}</div>
-        <div class="scan-substatus" id="scanSub">${IdentifyService.steps[0].sub}</div>
+        <div class="scan-status" id="scanStatus">${steps[0].label}</div>
+        <div class="scan-substatus" id="scanSub">${steps[0].sub}</div>
         <div class="scan-progress-track"><div class="scan-progress-fill" id="scanFill"></div></div>
         <ul class="scan-checklist" id="scanChecklist">
-          ${IdentifyService.steps.map(s => `<li><span class="chk"></span>${s.label.replace('…', '')}</li>`).join('')}
+          ${steps.map(s => `<li><span class="chk"></span>${s.label.replace('…', '')}</li>`).join('')}
         </ul>
       </div>
     </section>
@@ -2652,6 +2796,35 @@ async function startScan(photo, apiKey) {
   renderResult(product);
 }
 
+async function startLinkScan(link) {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderScanning(LINK_STEPS);
+  const onStep = wireScanUI();
+
+  let product;
+  try {
+    product = await IdentifyService.identifyLink(link, onStep);
+  } catch (err) {
+    renderError(err.message || 'Something went wrong while reading that link. Please try again.');
+    return;
+  }
+
+  markAllStepsDone();
+  SubscriptionService.recordScan();   // only a successful scan costs a credit
+  State.product = product;
+  await sleep(400);
+  renderResult(product);
+}
+
+/** Says where the analyzed image came from, so a link result isn't mistaken for a photo. */
+function sourceBadge(product) {
+  const source = product.source;
+  if (!source) return 'Identified from your photo';
+  if (source.kind === 'video-cover') return `From the ${source.host} video's cover image`;
+  if (source.kind === 'page-image') return `From the image on ${source.host}`;
+  return 'From the image link you pasted';
+}
+
 function renderResult(product) {
   const name = escapeHtml(product.name);
   const links = buildSearchLinks(product.searchQuery);
@@ -2664,8 +2837,10 @@ function renderResult(product) {
 
         <div class="result-grid">
           <div class="result-visual">
-            <img src="${product.image}" alt="${name}" style="position:relative;z-index:1;max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;" />
-            <div class="result-platform-badge">${ICON_CHECK} Identified from your photo</div>
+            ${product.image
+              ? `<img src="${escapeHtml(product.image)}" alt="${name}" style="position:relative;z-index:1;max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;" />`
+              : `<div class="product-silhouette" style="position:relative;z-index:1;">${ICON_LINK}</div>`}
+            <div class="result-platform-badge">${ICON_CHECK} ${escapeHtml(sourceBadge(product))}</div>
           </div>
 
           <div class="result-info">
@@ -2675,6 +2850,9 @@ function renderResult(product) {
             </div>
             <h1 class="result-title">${name}</h1>
             <p class="result-desc">${escapeHtml(product.description)}</p>
+
+            ${product.source && product.source.kind === 'video-cover' ? `
+            <p class="source-note">${ICON_INFO} We could only look at this video's cover image. If the product you meant isn't on it, take a screenshot of the right moment and upload that instead.</p>` : ''}
 
             ${product.whatItDoes ? `
             <div class="info-card">
@@ -2784,7 +2962,7 @@ function renderError(message) {
 
 /** clearPhoto=true starts a fresh scan; false keeps the current photo loaded. */
 function goHome(clearPhoto) {
-  if (clearPhoto) State.photo = null;
+  if (clearPhoto) { State.photo = null; State.lastLink = ''; }
   State.product = null;
   window.scrollTo({ top: 0, behavior: 'smooth' });
   renderHome();

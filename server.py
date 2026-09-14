@@ -26,16 +26,21 @@ Optional environment variables:
 """
 
 import base64
+import http.client
+import ipaddress
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
 import urllib.error
 import urllib.request
 import webbrowser
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, quote, urljoin, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP_FILE = os.path.join(HERE, "viral-product-finder-STANDALONE.html")
@@ -55,6 +60,14 @@ RETRY_PAUSE_SECONDS = float(os.environ.get("RETRY_PAUSE_SECONDS", "1.5"))
 # Only these paths are ever served. Everything else in the folder - above all
 # .env and this file - returns 404, so the key cannot be downloaded.
 APP_PATHS = {"/", "/index.html", "/viral-product-finder-STANDALONE.html"}
+
+# Links: the server fetches one image on the visitor's behalf.
+MAX_LINK_LENGTH = 2048
+MAX_PAGE_BYTES = 2 * 1024 * 1024
+LINK_TIMEOUT_SECONDS = 12
+LINK_USER_AGENT = "Mozilla/5.0 (compatible; AIViralProductFinder/1.0; +https://ai-viral-product-finder.onrender.com)"
+YOUTUBE_THUMBNAIL_URL = "https://i.ytimg.com/vi/%s/%s"
+TIKTOK_OEMBED_URL = "https://www.tiktok.com/oembed?url="
 
 
 class ClientError(Exception):
@@ -276,7 +289,7 @@ def parse_answer(text):
     return None
 
 
-def identify(image_data_url, key, refreshed=False):
+def identify(image_data_url, key, refreshed=False, context=""):
     match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$", image_data_url or "")
     if not match:
         raise ClientError(400, "Please send a JPG, PNG or WEBP photo.")
@@ -289,6 +302,12 @@ def identify(image_data_url, key, refreshed=False):
         raise ClientError(413, "That photo is too large. Please use one under 6MB.")
 
     prompt = load_prompt()
+    if context:
+        # A page or video title helps a lot ("Stanley Quencher H2.0 40oz..."), but
+        # strangers write those, so it is offered as a hint, never as an instruction.
+        prompt += ("\n\nThe image came from a web page or video titled: \"%s\". Use that only as a hint: "
+                   "trust what you can see in the image, and still reply in the JSON shape above."
+                   % context[:200].replace('"', "'"))
     models = MODELS.get(key, refresh=refreshed)
     shortlist = models[:4]
 
@@ -343,8 +362,220 @@ def identify(image_data_url, key, refreshed=False):
 
     if retired == len(shortlist) and not refreshed:
         log("All cached Gemini models are gone - refreshing the list")
-        return identify(image_data_url, key, refreshed=True)
+        return identify(image_data_url, key, refreshed=True, context=context)
     raise last_error
+
+
+# --------------------------------------------------------------------------
+# Links
+# A browser can't read TikTok or a shop page, but this server can. From a link
+# we take ONE image - a video's cover, a page's preview image, or the image the
+# link points at - and identify it exactly like an uploaded photo.
+# --------------------------------------------------------------------------
+
+def is_host(host, domain):
+    return host == domain or host.endswith("." + domain)
+
+
+def assert_public_url(url):
+    """
+    Refuse anything that isn't an ordinary public website. Without this a
+    visitor could make the server fetch addresses inside Render's own network
+    (server-side request forgery).
+    """
+    parts = urlparse(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ClientError(400, "Paste a full link that starts with https://")
+    try:
+        port = parts.port
+    except ValueError:
+        raise ClientError(400, "That link isn't valid.")
+    if port not in (None, 80, 443):
+        raise ClientError(400, "That link uses an unusual port and can't be opened.")
+    try:
+        addresses = socket.getaddrinfo(parts.hostname, port or 443, type=socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError):
+        raise ClientError(422, "That website couldn't be found. Check the link.")
+    for address in addresses:
+        if not ipaddress.ip_address(address[4][0].split("%")[0]).is_global:
+            raise ClientError(400, "That link points to a private network address and can't be opened.")
+
+
+class CheckedRedirects(urllib.request.HTTPRedirectHandler):
+    """Re-check every hop: a public page can redirect to a private address."""
+    max_redirections = 5
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        assert_public_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+LINK_OPENER = urllib.request.build_opener(CheckedRedirects)
+
+
+def fetch_link(url, max_bytes):
+    """GET a public URL. Returns (final_url, content_type, body); raises ClientError."""
+    assert_public_url(url)
+    request = urllib.request.Request(url, headers={
+        "User-Agent": LINK_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,image/webp,image/*;q=0.9,*/*;q=0.5",
+        "Accept-Language": "en-US,en;q=0.8",
+    })
+    try:
+        with LINK_OPENER.open(request, timeout=LINK_TIMEOUT_SECONDS) as response:
+            return response.geturl(), response.headers.get("Content-Type", ""), response.read(max_bytes + 1)
+    except urllib.error.HTTPError as error:
+        if error.code in (401, 403, 429, 999):
+            raise ClientError(422, "That website blocks automatic visits, so the link can't be read. "
+                                   "Take a screenshot and upload it instead.")
+        if error.code in (404, 410):
+            raise ClientError(422, "That link leads to a page that doesn't exist. Check it and try again.")
+        raise ClientError(422, "That website returned an error (%s). Try a screenshot instead." % error.code)
+    except ClientError:
+        raise
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
+        raise ClientError(422, "That link couldn't be opened. Check it, or take a screenshot and upload it instead.")
+
+
+def sniff_image(data):
+    """Trust the bytes, not the Content-Type header."""
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def as_data_url(data):
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ClientError(422, "The image behind that link is larger than 6MB.")
+    mime = sniff_image(data)
+    if not mime:
+        raise ClientError(422, "The image behind that link isn't a JPG, PNG or WEBP.")
+    return "data:%s;base64,%s" % (mime, base64.b64encode(data).decode("ascii"))
+
+
+def fetch_image(url):
+    return as_data_url(fetch_link(url, MAX_IMAGE_BYTES)[2])
+
+
+class PagePreview(HTMLParser):
+    """The preview image and title a page offers to link-sharing apps."""
+    IMAGE_KEYS = ("og:image:secure_url", "og:image", "og:image:url", "twitter:image", "twitter:image:src", "image_src")
+    TITLE_KEYS = ("og:title", "twitter:title")
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.meta = {}
+        self.page_title = ""
+        self.in_title = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs = {name.lower(): (value or "").strip() for name, value in attrs}
+        if tag == "meta":
+            key = (attrs.get("property") or attrs.get("name") or "").lower()
+            if key and attrs.get("content"):
+                self.meta.setdefault(key, attrs["content"])
+        elif tag == "link" and "image_src" in attrs.get("rel", "").lower().split() and attrs.get("href"):
+            self.meta.setdefault("image_src", attrs["href"])
+        elif tag == "title":
+            self.in_title = True
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self.in_title = False
+
+    def handle_data(self, data):
+        if self.in_title and len(self.page_title) < 300:
+            self.page_title += data
+
+    def image(self):
+        return next((self.meta[key] for key in self.IMAGE_KEYS if self.meta.get(key)), None)
+
+    def title(self):
+        found = next((self.meta[key] for key in self.TITLE_KEYS if self.meta.get(key)), self.page_title)
+        return " ".join(found.split())
+
+
+def youtube_video_id(parts):
+    host = (parts.hostname or "").lower()
+    candidate = ""
+    if is_host(host, "youtu.be"):
+        candidate = parts.path.strip("/").split("/")[0]
+    elif is_host(host, "youtube.com") or is_host(host, "youtube-nocookie.com"):
+        if parts.path.rstrip("/") == "/watch":
+            candidate = parse_qs(parts.query).get("v", [""])[0]
+        else:
+            match = re.match(r"^/(?:shorts|embed|live|v)/([^/?#]+)", parts.path)
+            candidate = match.group(1) if match else ""
+    return candidate if re.match(r"^[A-Za-z0-9_-]{11}$", candidate) else None
+
+
+def normalise_link(text):
+    link = str(text or "").strip()
+    if len(link) > MAX_LINK_LENGTH:
+        raise ClientError(400, "That link is too long.")
+    if not re.match(r"^https?://", link, re.I):
+        if not re.match(r"^[\w-]+(\.[\w-]+)+(/|$)", link):
+            raise ClientError(400, "Paste a full link, like https://www.tiktok.com/...")
+        link = "https://" + link
+    return link
+
+
+def link_to_image(text):
+    """Turn a pasted link into (image_data_url, source) where source says where it came from."""
+    link = normalise_link(text)
+    parts = urlparse(link)
+    host = (parts.hostname or "").lower()
+
+    video = youtube_video_id(parts)
+    if video:
+        for size in ("maxresdefault.jpg", "hqdefault.jpg"):   # the large cover doesn't exist for every video
+            try:
+                return fetch_image(YOUTUBE_THUMBNAIL_URL % (video, size)), {"kind": "video-cover", "host": "YouTube", "title": ""}
+            except ClientError:
+                continue
+        raise ClientError(422, "Couldn't get that YouTube video's cover image. Check the link.")
+
+    if is_host(host, "tiktok.com"):
+        target = link
+        if host.split(".")[0] in ("vm", "vt"):   # short share links redirect to the real video
+            target = fetch_link(link, 256 * 1024)[0]
+        try:
+            info = json.loads(fetch_link(TIKTOK_OEMBED_URL + quote(target, safe=""), 256 * 1024)[2])
+        except ValueError:
+            info = {}
+        if not isinstance(info, dict) or not info.get("thumbnail_url"):
+            raise ClientError(422, "TikTok didn't share that video's cover image. "
+                                   "Take a screenshot of the video and upload it instead.")
+        return fetch_image(info["thumbnail_url"]), {"kind": "video-cover", "host": "TikTok",
+                                                     "title": str(info.get("title", ""))[:200]}
+
+    final_url, content_type, body = fetch_link(link, MAX_IMAGE_BYTES)
+    if sniff_image(body):
+        return as_data_url(body), {"kind": "image", "host": host, "title": ""}
+
+    page_text = body[:MAX_PAGE_BYTES].decode("utf-8", "replace")
+    if "html" not in content_type.lower() and "<html" not in page_text[:2000].lower():
+        raise ClientError(422, "That link isn't a web page or a JPG, PNG or WEBP image.")
+    page = PagePreview()
+    try:
+        page.feed(page_text)
+    except Exception:   # a broken page may still have given us its meta tags
+        pass
+    image = page.image()
+    if not image:
+        if is_host(host, "instagram.com") or is_host(host, "facebook.com"):
+            raise ClientError(422, "Instagram and Facebook don't let other sites read their posts. "
+                                   "Take a screenshot and upload it instead.")
+        # Seen with Amazon: a 200 page with no image at all is often a bot check,
+        # not a page that genuinely lacks one - so don't claim to know which.
+        raise ClientError(422, "We couldn't find a product image on that page. Some shops, like Amazon, "
+                               "hide it from automatic visits. Take a screenshot of the product and upload it instead.")
+    shown_host = host[4:] if host.startswith("www.") else host
+    return fetch_image(urljoin(final_url, image)), {"kind": "page-image", "host": shown_host, "title": page.title()[:200]}
 
 
 # --------------------------------------------------------------------------
@@ -433,12 +664,23 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             raise ClientError(400, "The request could not be read.")
         image = body.get("image") if isinstance(body, dict) else None
+        link = body.get("url") if isinstance(body, dict) else None
+        if not image and not link:
+            raise ClientError(400, "Send a photo or a link.")
 
+        # Checked before any link is visited, so the server can't be used as a
+        # free web-fetching proxy either.
         limited = LIMITER.check(self.client_ip())
         if limited:
             raise ClientError(429, limited)
 
-        return identify(image, key)
+        if image:
+            return identify(image, key)
+
+        image, source = link_to_image(link)
+        product = identify(image, key, context=source.get("title", ""))
+        product["source"] = dict(source, image=image)
+        return product
 
 
 def main():
