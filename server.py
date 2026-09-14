@@ -375,7 +375,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
-        self.wfile.write(payload)
+        if not getattr(self, "head_only", False):
+            self.wfile.write(payload)
 
     def send_json(self, status, data):
         self.send(status, json.dumps(data), "application/json; charset=utf-8")
@@ -389,6 +390,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"ok": True, "keyConfigured": bool(api_key())})
         else:
             self.send(404, "Not found", "text/plain; charset=utf-8")
+
+    def do_HEAD(self):
+        # Uptime monitors and link previews (WhatsApp, iMessage...) often ask
+        # with HEAD: same headers as GET, no body.
+        self.head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self.head_only = False
 
     def do_POST(self):
         if self.path.split("?", 1)[0] != "/api/identify":
