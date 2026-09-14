@@ -1,6 +1,6 @@
 # Render reads this file to create the web service from GitHub.
-# The API key is NOT here: Render asks you for GEMINI_API_KEY when you create
-# the service, and keeps it secret on their side.
+# The API keys are NOT here: Render asks for them when you create the service
+# and keeps them secret. Fill in OPENAI_API_KEY; GEMINI_API_KEY is only a backup.
 services:
   - type: web
     name: ai-viral-product-finder
@@ -11,5 +11,7 @@ services:
     startCommand: python3 server.py
     healthCheckPath: /api/health
     envVars:
+      - key: OPENAI_API_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false

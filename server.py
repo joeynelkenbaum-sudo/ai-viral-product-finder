@@ -2,8 +2,8 @@
 """
 AI Viral Product Finder - backend.
 
-Serves the app and talks to Google Gemini on the visitor's behalf, so the API
-key lives only on this server and never reaches anyone's browser.
+Serves the app and talks to the AI (OpenAI, or Google Gemini) on the visitor's
+behalf, so the API key lives only on this server and never reaches anyone's browser.
 
 Standard library only: nothing to pip install.
 
@@ -12,17 +12,19 @@ Run locally:
     then open http://localhost:8000
 
 The key:
-    Locally, put   GEMINI_API_KEY=your-key   in the .env file next to this script.
-    On a host (Render, Railway...), set GEMINI_API_KEY as an environment variable
+    Locally, put   OPENAI_API_KEY=your-key   in the .env file next to this script.
+    On a host (Render, Railway...), set OPENAI_API_KEY as an environment variable
     in their dashboard instead - never upload the .env file.
+    With no OpenAI key, GEMINI_API_KEY is used instead. OpenAI wins if both are set.
 
 Optional environment variables:
     PORT             port to listen on (hosts set this for you). Default 8000.
     RATE_PER_MINUTE  scans one visitor may run per minute.       Default 6.
     RATE_PER_DAY     scans one visitor may run per day.          Default 60.
     GLOBAL_PER_DAY   scans the whole site may run per day.       Default 1000.
-                     Kept under Gemini's free daily quota so strangers
-                     cannot exhaust your key.
+                     Caps what strangers can spend on your key.
+    OPENAI_MODEL     OpenAI model to use.                         Default gpt-5.6-luna.
+    OPENAI_REASONING_EFFORT   none, low, medium or high.          Default low.
 """
 
 import base64
@@ -47,6 +49,13 @@ APP_FILE = os.path.join(HERE, "viral-product-finder-STANDALONE.html")
 ENV_FILE = os.path.join(HERE, ".env")
 
 GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta")
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+# gpt-5.6-luna is OpenAI's cheapest current model with image input ($0.20 in /
+# $1.20 out per million tokens, September 2026). If a key can't use it, the
+# older gpt-4.1-mini is tried instead.
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")
+OPENAI_FALLBACK_MODELS = ["gpt-4.1-mini"]
+OPENAI_REASONING_EFFORT = os.environ.get("OPENAI_REASONING_EFFORT", "low")
 # A 6MB photo is ~8MB once base64-encoded, so the body limit sits a little
 # above that: photos near the limit get a readable "too large" answer, and
 # only genuinely absurd uploads are refused before being read.
@@ -98,9 +107,21 @@ def read_env_file():
     return values
 
 
+def ai_provider():
+    """
+    (provider, key), read on every request so adding a key to .env needs no
+    restart. OpenAI wins when both keys are set; ("", "") when neither is.
+    """
+    env = read_env_file()
+    for provider, name in (("openai", "OPENAI_API_KEY"), ("gemini", "GEMINI_API_KEY")):
+        key = (os.environ.get(name) or env.get(name, "")).strip()
+        if key:
+            return provider, key
+    return "", ""
+
+
 def api_key():
-    """Read on every request, so adding the key to .env needs no restart."""
-    return (os.environ.get("GEMINI_API_KEY") or read_env_file().get("GEMINI_API_KEY", "")).strip()
+    return ai_provider()[1]
 
 
 def load_prompt():
@@ -289,7 +310,7 @@ def parse_answer(text):
     return None
 
 
-def identify(image_data_url, key, refreshed=False, context=""):
+def identify(image_data_url, key, context="", provider="gemini"):
     match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$", image_data_url or "")
     if not match:
         raise ClientError(400, "Please send a JPG, PNG or WEBP photo.")
@@ -308,6 +329,12 @@ def identify(image_data_url, key, refreshed=False, context=""):
         prompt += ("\n\nThe image came from a web page or video titled: \"%s\". Use that only as a hint: "
                    "trust what you can see in the image, and still reply in the JSON shape above."
                    % context[:200].replace('"', "'"))
+    if provider == "openai":
+        return identify_openai(mime, data, prompt, key)
+    return identify_gemini(mime, data, prompt, key)
+
+
+def identify_gemini(mime, data, prompt, key, refreshed=False):
     models = MODELS.get(key, refresh=refreshed)
     shortlist = models[:4]
 
@@ -362,7 +389,118 @@ def identify(image_data_url, key, refreshed=False, context=""):
 
     if retired == len(shortlist) and not refreshed:
         log("All cached Gemini models are gone - refreshing the list")
-        return identify(image_data_url, key, refreshed=True, context=context)
+        return identify_gemini(mime, data, prompt, key, refreshed=True)
+    raise last_error
+
+
+# --------------------------------------------------------------------------
+# OpenAI (Responses API)
+# --------------------------------------------------------------------------
+
+def openai_call(key, payload):
+    """One call to POST /responses, returning (status, json_body)."""
+    request = urllib.request.Request(
+        OPENAI_API_BASE + "/responses", data=json.dumps(payload).encode("utf-8"), method="POST",
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return response.status, json.loads(response.read() or b"{}")
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read() or b"{}")
+        except ValueError:
+            return error.code, {}
+    except (urllib.error.URLError, OSError):
+        raise ClientError(502, "The server could not reach OpenAI. Please try again in a moment.")
+
+
+def openai_error(status, body, model):
+    error = (body or {}).get("error") or {}
+    detail, code = error.get("message", ""), error.get("code") or error.get("type") or ""
+    log("OpenAI error %s (%s) on %s: %s" % (status, code, model, detail or body))
+
+    if status == 401:
+        # The visitor can't fix this - it's the site owner's key.
+        return ClientError(502, "The server's OpenAI API key was rejected. "
+                                "The site owner needs to check OPENAI_API_KEY.")
+    if code == "insufficient_quota":
+        return ClientError(503, "The site's OpenAI account has run out of credit. "
+                                "The site owner needs to add billing at platform.openai.com.")
+    if status == 429:
+        return ClientError(503, "The AI is busy right now. Please try again in a minute.")
+    if status >= 500:
+        return ClientError(503, "OpenAI is having trouble right now (%s). Please try again in a minute." % status)
+    if status == 400 and re.search("image", detail, re.I):
+        return ClientError(422, "OpenAI couldn't read that image. Try a different photo.")
+    return ClientError(502, "OpenAI returned an error (status %s)%s" % (status, ": " + detail if detail else "."))
+
+
+def openai_answer(body):
+    """The model's JSON from a Responses API reply, or None; raises on refusals and cut-offs."""
+    text, refused = "", False
+    for item in body.get("output") or []:
+        for part in item.get("content") or []:
+            if part.get("type") == "output_text":
+                text += part.get("text", "")
+            elif part.get("type") == "refusal":
+                refused = True
+    reason = (body.get("incomplete_details") or {}).get("reason")
+    if refused or reason == "content_filter":
+        raise ClientError(422, "OpenAI declined to analyze that image. Try a different photo.")
+    answer = parse_answer(text)
+    if answer is None and reason == "max_output_tokens":
+        raise ClientError(502, "The AI ran out of room before answering. Please try again.")
+    return answer
+
+
+def identify_openai(mime, data, prompt, key):
+    last_error = ClientError(503, "OpenAI could not be reached. Please try again in a minute.")
+
+    for model in [OPENAI_MODEL] + [m for m in OPENAI_FALLBACK_MODELS if m != OPENAI_MODEL]:
+        payload = {
+            "model": model,
+            "input": [{"role": "user", "content": [
+                {"type": "input_text", "text": prompt},
+                {"type": "input_image", "image_url": "data:%s;base64,%s" % (mime, data), "detail": "auto"},
+            ]}],
+            "text": {"format": {"type": "json_object"}},
+            "reasoning": {"effort": OPENAI_REASONING_EFFORT},
+            # Reasoning models spend hidden tokens from this same budget.
+            "max_output_tokens": 4096,
+        }
+        stripped = retried = False
+
+        while True:
+            status, body = openai_call(key, payload)
+            if status == 200:
+                answer = openai_answer(body)
+                if answer is not None:
+                    return answer
+                last_error = ClientError(502, "The AI's answer could not be read. Please try a clearer photo.")
+                break
+
+            error = (body or {}).get("error") or {}
+            param = str(error.get("param") or "")
+            if (status == 400 and not stripped
+                    and (param.startswith(("reasoning", "text")) or "unsupported parameter" in error.get("message", "").lower())):
+                # e.g. the non-reasoning fallback model refusing "reasoning": drop the extras, try again.
+                stripped = True
+                payload.pop("reasoning", None)
+                payload.pop("text", None)
+                continue
+
+            last_error = openai_error(status, body, model)
+            if status == 404 or error.get("code") == "model_not_found":
+                break                               # try the fallback model
+            busy = (status == 429 and error.get("code") != "insufficient_quota") or status >= 500
+            if busy and not retried:
+                retried = True
+                time.sleep(RETRY_PAUSE_SECONDS)
+                continue
+            if busy:
+                break                               # still busy: try the fallback model
+            raise last_error                        # bad key, no credit, bad image: retrying won't help
+
     raise last_error
 
 
@@ -618,7 +756,8 @@ class Handler(BaseHTTPRequestHandler):
             with open(APP_FILE, "rb") as handle:
                 self.send(200, handle.read(), "text/html; charset=utf-8")
         elif path == "/api/health":
-            self.send_json(200, {"ok": True, "keyConfigured": bool(api_key())})
+            provider, key = ai_provider()
+            self.send_json(200, {"ok": True, "keyConfigured": bool(key), "provider": provider or None})
         else:
             self.send(404, "Not found", "text/plain; charset=utf-8")
 
@@ -653,11 +792,11 @@ class Handler(BaseHTTPRequestHandler):
         if length > MAX_BODY_BYTES:
             raise ClientError(413, "That photo is too large. Please use one under 6MB.")
 
-        key = api_key()
+        provider, key = ai_provider()
         if not key:
             where = "in the host's Environment settings" if "PORT" in os.environ else "to the .env file"
-            raise ClientError(503, "The server has no Gemini API key yet. The site owner needs to add "
-                                   "GEMINI_API_KEY %s." % where)
+            raise ClientError(503, "The server has no AI key yet. The site owner needs to add "
+                                   "OPENAI_API_KEY %s." % where)
 
         try:
             body = json.loads(self.rfile.read(length))
@@ -675,10 +814,10 @@ class Handler(BaseHTTPRequestHandler):
             raise ClientError(429, limited)
 
         if image:
-            return identify(image, key)
+            return identify(image, key, provider=provider)
 
         image, source = link_to_image(link)
-        product = identify(image, key, context=source.get("title", ""))
+        product = identify(image, key, context=source.get("title", ""), provider=provider)
         product["source"] = dict(source, image=image)
         return product
 
@@ -705,13 +844,16 @@ def main():
         print("\n  AI Viral Product Finder is running on port %d" % port)
     else:
         print("\n  AI Viral Product Finder is running at %s" % url)
-    if api_key():
-        print("  Gemini API key: found (kept on the server, never sent to browsers)")
+    provider, _ = ai_provider()
+    if provider == "openai":
+        print("  AI: OpenAI %s (key kept on the server, never sent to browsers)" % OPENAI_MODEL)
+    elif provider == "gemini":
+        print("  AI: Google Gemini (key kept on the server). Add OPENAI_API_KEY to use OpenAI instead.")
     elif on_a_host:
-        print("  Gemini API key: MISSING - set GEMINI_API_KEY in your host's Environment settings")
+        print("  AI key: MISSING - set OPENAI_API_KEY in your host's Environment settings")
     else:
-        print("  Gemini API key: MISSING - add GEMINI_API_KEY=your-key to the .env file")
-        print("                  (no restart needed after you save it)")
+        print("  AI key: MISSING - add OPENAI_API_KEY=your-key to the .env file")
+        print("          (no restart needed after you save it)")
     print("  Press Ctrl+C to stop.\n")
 
     if not on_a_host and not os.environ.get("NO_BROWSER"):
