@@ -1,0 +1,15 @@
+# Render reads this file to create the web service from GitHub.
+# The API key is NOT here: Render asks you for GEMINI_API_KEY when you create
+# the service, and keeps it secret on their side.
+services:
+  - type: web
+    name: ai-viral-product-finder
+    runtime: python
+    plan: free
+    # server.py only uses Python's standard library - nothing to install.
+    buildCommand: echo "No dependencies to install"
+    startCommand: python3 server.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false

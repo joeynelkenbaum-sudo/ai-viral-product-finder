@@ -1,0 +1,2856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Viral Product Finder — See it. Scan it. Buy it.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+    --bg:#0a0a12;
+    --bg-soft:#0d0d17;
+    --surface:#131320;
+    --surface-2:#191928;
+    --surface-3:#1f1f30;
+    --border:#26263a;
+    --border-soft:#1c1c2c;
+    --text:#f4f3fa;
+    --text-dim:#a6a4bd;
+    --text-faint:#6c6a86;
+    --pink:#ff3e7f;
+    --violet:#8b5cf6;
+    --lime:#c3ff3d;
+    --cyan:#3de8ff;
+    --grad-viral: linear-gradient(135deg, var(--pink), var(--violet));
+    --grad-viral-soft: linear-gradient(135deg, rgba(255,62,127,0.16), rgba(139,92,246,0.16));
+    --font-display: 'Bricolage Grotesque', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 10px;
+    --shadow-card: 0 20px 50px -20px rgba(0,0,0,0.6);
+  }
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  img,svg{display:block;max-width:100%;}
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;cursor:pointer;}
+  ul{list-style:none;}
+
+  /* ambient background texture */
+  body::before{
+    content:'';
+    position:fixed;inset:0;
+    background:
+      radial-gradient(60% 45% at 15% 0%, rgba(255,62,127,0.14), transparent 60%),
+      radial-gradient(50% 40% at 100% 10%, rgba(139,92,246,0.16), transparent 60%),
+      radial-gradient(40% 30% at 50% 100%, rgba(195,255,61,0.05), transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  :focus-visible{
+    outline:2px solid var(--lime);
+    outline-offset:3px;
+    border-radius:6px;
+  }
+
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px;}
+
+  /* ===== NAV ===== */
+  .nav{
+    position:sticky;top:0;z-index:100;
+    background:rgba(10,10,18,0.72);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border-soft);
+  }
+  .nav-inner{
+    max-width:1180px;margin:0 auto;padding:16px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:24px;
+  }
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:-0.01em;}
+  .logo-mark{
+    width:34px;height:34px;border-radius:10px;
+    background:var(--grad-viral);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;flex:none;
+  }
+  .logo-mark svg{width:18px;height:18px;}
+  .logo-sub{color:var(--text-faint);font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;display:block;margin-top:1px;}
+  .nav-links{display:flex;align-items:center;gap:32px;}
+  .nav-links a{font-size:14px;font-weight:500;color:var(--text-dim);transition:color .2s ease;}
+  .nav-links a:hover{color:var(--text);}
+  .nav-cta{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--text);color:#0a0a12;
+    font-weight:600;font-size:14px;
+    padding:10px 18px;border-radius:100px;
+    border:none;transition:transform .18s ease, box-shadow .18s ease;
+    white-space:nowrap;
+  }
+  .nav-cta:hover{transform:translateY(-1px);box-shadow:0 8px 24px -8px rgba(195,255,61,0.4);}
+  .nav-burger{display:none;background:none;border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);}
+  .mobile-menu{
+    display:none;flex-direction:column;gap:16px;
+    border-top:1px solid var(--border-soft);padding:18px 24px 22px;
+  }
+  .mobile-menu.open{display:flex;}
+
+  @media (max-width:840px){
+    .nav-links{display:none;}
+    .nav-burger{display:flex;}
+    .nav-cta.desktop-only{display:none;}
+  }
+
+  /* ===== HERO ===== */
+  .hero{
+    position:relative;z-index:1;
+    padding:88px 0 60px;
+  }
+  .hero-inner{
+    display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--font-mono);font-size:12px;letter-spacing:0.06em;
+    color:var(--lime);background:rgba(195,255,61,0.08);
+    border:1px solid rgba(195,255,61,0.25);
+    padding:6px 12px;border-radius:100px;margin-bottom:22px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);animation:pulse-dot 1.6s ease-in-out infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.35;}}
+
+  h1.headline{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(40px, 5.4vw, 68px);
+    line-height:1.02;
+    letter-spacing:-0.02em;
+    margin-bottom:22px;
+  }
+  h1.headline .accent{
+    background:var(--grad-viral);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .sub{
+    font-size:18px;color:var(--text-dim);max-width:520px;margin-bottom:34px;line-height:1.55;
+  }
+
+  .form-error{
+    margin-top:12px;font-size:13.5px;color:var(--pink);
+    display:none;align-items:center;gap:8px;
+    background:rgba(255,62,127,0.08);border:1px solid rgba(255,62,127,0.25);
+    padding:10px 14px;border-radius:10px;
+  }
+  .form-error.show{display:flex;}
+  .form-error svg{width:16px;height:16px;flex:none;}
+  .form-error.shake{animation:shake .4s ease;}
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    20%{transform:translateX(-6px);}
+    40%{transform:translateX(6px);}
+    60%{transform:translateX(-4px);}
+    80%{transform:translateX(4px);}
+  }
+
+  .platform-mini{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--border);border-radius:100px;font-size:11.5px;color:var(--text-faint);}
+  .platform-mini svg{width:12px;height:12px;}
+
+  .mode-tag{
+    display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10.5px;
+    padding:4px 10px;border-radius:100px;vertical-align:middle;
+  }
+  .mode-tag svg{width:11px;height:11px;flex:none;}
+  .mode-tag.real{background:rgba(195,255,61,0.1);border:1px solid rgba(195,255,61,0.3);color:var(--lime);}
+
+  /* ===== Scan panel (photo only) ===== */
+  .scan-panel{max-width:560px;}
+  .scan-panel input[type="file"]{display:none;}
+  .scan-panel .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .upload-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
+  .upload-actions .camera-btn{margin-top:0;}
+  @media (max-width:520px){
+    .upload-actions{grid-template-columns:1fr;}
+  }
+
+  /* ===== Photo upload dropzone ===== */
+  .dropzone{
+    background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--radius-md);
+    padding:28px 22px;text-align:center;cursor:pointer;transition:all .2s ease;box-shadow:var(--shadow-card);
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--lime);background:var(--surface-2);}
+  .dropzone input[type="file"]{display:none;}
+  .dropzone .dz-icon{
+    width:44px;height:44px;border-radius:12px;background:var(--grad-viral-soft);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
+  }
+  .dropzone .dz-icon svg{width:21px;height:21px;color:var(--text);}
+  .dropzone p{font-size:14px;color:var(--text-dim);margin-bottom:4px;}
+  .dropzone span.hint{font-size:12px;color:var(--text-faint);}
+
+  /* ===== Camera capture ===== */
+  .camera-btn{
+    width:100%;margin-top:10px;
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    background:var(--surface);border:1px solid var(--border);color:var(--text-dim);
+    font-weight:600;font-size:13.5px;padding:13px;border-radius:14px;transition:all .18s ease;
+  }
+  .camera-btn:hover{border-color:var(--cyan);color:var(--text);}
+  .camera-btn svg{width:17px;height:17px;}
+  .camera-btn.hidden{display:none;}
+
+  .camera-stage{
+    display:none;position:relative;margin-top:12px;
+    border-radius:var(--radius-md);overflow:hidden;
+    background:#000;border:1px solid var(--border);
+    aspect-ratio:4/3;
+  }
+  .camera-stage.active{display:block;}
+  .camera-stage video{width:100%;height:100%;object-fit:cover;display:block;}
+  .camera-frame{position:absolute;inset:14%;pointer-events:none;}
+  .camera-frame span{position:absolute;width:26px;height:26px;}
+  .camera-frame span:nth-child(1){top:0;left:0;border-top:3px solid var(--lime);border-left:3px solid var(--lime);border-radius:6px 0 0 0;}
+  .camera-frame span:nth-child(2){top:0;right:0;border-top:3px solid var(--lime);border-right:3px solid var(--lime);border-radius:0 6px 0 0;}
+  .camera-frame span:nth-child(3){bottom:0;left:0;border-bottom:3px solid var(--lime);border-left:3px solid var(--lime);border-radius:0 0 0 6px;}
+  .camera-frame span:nth-child(4){bottom:0;right:0;border-bottom:3px solid var(--lime);border-right:3px solid var(--lime);border-radius:0 0 6px 0;}
+  .camera-controls{
+    position:absolute;bottom:0;left:0;right:0;padding:16px;
+    display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+  }
+  .cam-shutter{
+    width:60px;height:60px;border-radius:50%;border:3px solid #fff;background:rgba(255,255,255,0.2);
+    display:flex;align-items:center;justify-content:center;transition:transform .12s ease;
+  }
+  .cam-shutter span{width:44px;height:44px;border-radius:50%;background:#fff;transition:transform .12s ease;}
+  .cam-shutter:active span{transform:scale(0.85);}
+  .cam-cancel, .cam-flip{
+    background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.25);color:#fff;
+    border-radius:100px;padding:9px 15px;font-size:13px;font-weight:600;backdrop-filter:blur(6px);
+  }
+  .cam-flip{width:42px;height:42px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .cam-flip svg{width:17px;height:17px;}
+  .cam-cancel:hover, .cam-flip:hover{background:rgba(0,0,0,0.75);}
+  .camera-flash{
+    position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;
+  }
+  .camera-flash.fire{animation:flash .45s ease;}
+  @keyframes flash{0%{opacity:0.9;}100%{opacity:0;}}
+
+  .dz-preview{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow-card);}
+  .dz-preview.active{display:flex;gap:14px;align-items:center;}
+  .dz-preview img{width:64px;height:64px;object-fit:cover;border-radius:10px;flex:none;border:1px solid var(--border);}
+  .dz-preview .dz-info{flex:1;min-width:0;}
+  .dz-preview .dz-info p{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dz-preview .dz-info span{font-size:12px;color:var(--text-faint);}
+  .dz-remove{
+    flex:none;width:30px;height:30px;border-radius:8px;background:var(--surface-3);
+    border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-dim);
+  }
+  .dz-remove:hover{color:var(--pink);border-color:rgba(255,62,127,0.4);}
+  .dz-remove svg{width:14px;height:14px;}
+
+  .identify-btn{
+    width:100%;margin-top:14px;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--grad-viral);color:#fff;font-weight:700;font-size:15px;
+    padding:14px 22px;border-radius:14px;border:none;
+    transition:transform .18s ease, box-shadow .18s ease, filter .18s ease, opacity .18s ease;
+  }
+  .identify-btn:not(:disabled):hover{transform:translateY(-1px);filter:brightness(1.08);}
+  .identify-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none;}
+  .identify-btn svg{width:17px;height:17px;}
+
+  /* ===== API key panel ===== */
+  .key-toggle{
+    display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-faint);
+    background:none;border:none;margin-top:12px;padding:4px 0;
+  }
+  .key-toggle.needed{
+    color:var(--lime);font-weight:700;
+    background:rgba(195,255,61,0.08);border:1px solid rgba(195,255,61,0.35);
+    border-radius:10px;padding:10px 14px;width:100%;justify-content:center;
+  }
+  .key-toggle svg{width:13px;height:13px;}
+  .key-toggle:hover{color:var(--text-dim);}
+  .key-panel{
+    display:none;margin-top:12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:16px;
+  }
+  .key-panel.open{display:block;}
+  .key-panel label{font-size:12.5px;font-weight:600;color:var(--text-dim);display:block;margin-bottom:8px;}
+  .key-row{display:flex;gap:8px;}
+  .key-row input{
+    flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;min-width:0;
+  }
+  .key-save{
+    flex:none;background:var(--surface-3);border:1px solid var(--border);color:var(--text);
+    font-weight:600;font-size:12.5px;padding:0 14px;border-radius:8px;
+  }
+  .key-save:hover{border-color:var(--lime);color:var(--lime);}
+  .key-panel .key-note{font-size:11.5px;color:var(--text-faint);margin-top:9px;line-height:1.5;}
+  .key-panel .key-note a{color:var(--cyan);text-decoration:underline;}
+  .key-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--lime);margin-top:9px;}
+  .key-status svg{width:13px;height:13px;}
+
+  /* ===== Usage pill in nav ===== */
+  .usage-pill{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--surface);border:1px solid var(--border);
+    padding:7px 13px;border-radius:100px;font-size:12.5px;color:var(--text-dim);
+    font-family:var(--font-mono);white-space:nowrap;
+  }
+  .usage-pill .plan-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .usage-pill.pro .plan-dot{background:var(--lime);box-shadow:0 0 8px var(--lime);}
+  .usage-pill b{color:var(--text);font-weight:600;}
+  @media (max-width:1000px){.usage-pill{display:none;}}
+
+  /* ===== Pricing ===== */
+  .billing-toggle{
+    display:inline-flex;align-items:center;gap:10px;background:var(--surface);
+    border:1px solid var(--border);border-radius:100px;padding:4px;margin:0 auto 40px;
+  }
+  .billing-toggle button{
+    border:none;background:none;color:var(--text-faint);font-weight:600;font-size:13px;
+    padding:9px 18px;border-radius:100px;transition:all .2s ease;
+  }
+  .billing-toggle button.active{background:var(--grad-viral);color:#fff;}
+  .save-badge{
+    font-family:var(--font-mono);font-size:10px;color:var(--lime);
+    background:rgba(195,255,61,0.12);padding:2px 7px;border-radius:100px;margin-left:6px;
+  }
+  .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1020px;margin:0 auto;align-items:stretch;}
+  .price-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:32px 28px;display:flex;flex-direction:column;position:relative;
+    transition:transform .2s ease, border-color .2s ease;
+  }
+  .price-card:hover{transform:translateY(-4px);}
+  .price-card.featured{
+    border-color:rgba(255,62,127,0.45);
+    background:linear-gradient(165deg, rgba(255,62,127,0.07), var(--surface) 55%);
+    box-shadow:var(--shadow-card);
+  }
+  .price-badge{
+    position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+    background:var(--grad-viral);color:#fff;font-size:11px;font-weight:700;
+    padding:5px 14px;border-radius:100px;letter-spacing:0.03em;white-space:nowrap;
+  }
+  .price-card h3{font-family:var(--font-display);font-size:19px;font-weight:600;margin-bottom:6px;}
+  .price-card .tagline{font-size:13.5px;color:var(--text-faint);margin-bottom:22px;min-height:38px;}
+  .price-amount{display:flex;align-items:baseline;gap:5px;margin-bottom:6px;}
+  .price-amount .amt{font-family:var(--font-display);font-size:42px;font-weight:700;letter-spacing:-0.02em;}
+  .price-amount .per{font-size:13.5px;color:var(--text-faint);}
+  .price-sub{font-size:12.5px;color:var(--text-faint);margin-bottom:24px;min-height:18px;}
+  .price-features{display:flex;flex-direction:column;gap:11px;margin-bottom:28px;}
+  .price-features li{display:flex;gap:10px;font-size:13.5px;color:var(--text-dim);line-height:1.45;}
+  .price-features li svg{width:15px;height:15px;color:var(--lime);flex:none;margin-top:2px;}
+  .price-features li.off{color:var(--text-faint);}
+  .price-features li.off svg{color:var(--text-faint);opacity:0.5;}
+  .price-btn{
+    margin-top:auto;width:100%;padding:13px;border-radius:12px;font-weight:700;font-size:14px;
+    border:1px solid var(--border);background:var(--surface-3);color:var(--text);transition:all .18s ease;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .price-btn svg{width:15px;height:15px;flex:none;}
+  .price-btn:not(:disabled):hover{transform:translateY(-1px);border-color:var(--text-faint);}
+  .price-btn.primary{background:var(--grad-viral);border-color:transparent;color:#fff;}
+  .price-btn.primary:hover{filter:brightness(1.08);}
+  .price-btn.current{background:none;border-color:rgba(195,255,61,0.4);color:var(--lime);cursor:default;}
+  .price-btn.current:hover{transform:none;}
+  @media (max-width:860px){.pricing-grid{grid-template-columns:1fr;max-width:420px;}}
+
+  /* ===== Modal ===== */
+  .modal-overlay{
+    position:fixed;inset:0;z-index:200;background:rgba(5,5,10,0.78);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:24px;
+  }
+  .modal-overlay.open{display:flex;animation:fadeIn .25s ease both;}
+  .modal{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+    max-width:440px;width:100%;padding:34px 30px;position:relative;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);
+    max-height:90vh;overflow-y:auto;
+    animation:modalIn .3s cubic-bezier(.2,.9,.3,1) both;
+  }
+  @keyframes modalIn{from{opacity:0;transform:translateY(16px) scale(.97);}to{opacity:1;transform:none;}}
+  .modal-close{
+    position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:9px;
+    background:var(--surface-3);border:1px solid var(--border);color:var(--text-dim);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .modal-close:hover{color:var(--text);}
+  .modal-close svg{width:15px;height:15px;}
+  .modal-icon{
+    width:54px;height:54px;border-radius:15px;background:var(--grad-viral-soft);
+    display:flex;align-items:center;justify-content:center;margin-bottom:18px;
+  }
+  .modal-icon svg{width:25px;height:25px;color:var(--text);}
+  .modal h3{font-family:var(--font-display);font-size:22px;font-weight:700;margin-bottom:10px;}
+  .modal > p{color:var(--text-dim);font-size:14.5px;margin-bottom:22px;line-height:1.55;}
+  .modal-plan{
+    border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;
+    cursor:pointer;transition:all .18s ease;display:flex;align-items:center;gap:14px;
+  }
+  .modal-plan:hover{border-color:var(--text-faint);}
+  .modal-plan.selected{border-color:var(--pink);background:rgba(255,62,127,0.06);}
+  .modal-plan .radio{
+    width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);flex:none;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .modal-plan.selected .radio{border-color:var(--pink);}
+  .modal-plan.selected .radio::after{content:'';width:9px;height:9px;border-radius:50%;background:var(--pink);}
+  .modal-plan .mp-info{flex:1;}
+  .modal-plan .mp-info strong{display:block;font-size:14.5px;margin-bottom:2px;}
+  .modal-plan .mp-info span{font-size:12.5px;color:var(--text-faint);}
+  .modal-plan .mp-price{font-family:var(--font-mono);font-size:14px;color:var(--lime);font-weight:600;white-space:nowrap;}
+  .modal-cta{
+    width:100%;padding:14px;border-radius:13px;border:none;margin-top:8px;
+    background:var(--grad-viral);color:#fff;font-weight:700;font-size:15px;
+    display:flex;align-items:center;justify-content:center;gap:9px;transition:filter .18s ease;
+  }
+  .modal-cta:hover{filter:brightness(1.08);}
+  .modal-cta:disabled{opacity:0.6;cursor:wait;}
+  .modal-cta svg{width:16px;height:16px;}
+  .demo-notice{
+    display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:12px;
+    background:rgba(255,204,77,0.07);border:1px solid rgba(255,204,77,0.25);border-radius:10px;
+    font-size:12px;color:var(--text-dim);line-height:1.5;
+  }
+  .demo-notice svg{width:14px;height:14px;color:#ffcc4d;flex:none;margin-top:1px;}
+  .modal-manage{width:100%;text-align:center;margin-top:14px;font-size:12.5px;color:var(--text-faint);background:none;border:none;}
+  .modal-manage:hover{color:var(--pink);}
+
+  /* Hero visual: scanning viewfinder */
+  .hero-visual{position:relative;}
+  .viewfinder{
+    position:relative;
+    aspect-ratio:9/12.5;
+    max-width:340px;margin:0 auto;
+    border-radius:32px;
+    background:
+      radial-gradient(120% 90% at 20% 15%, rgba(255,62,127,0.35), transparent 55%),
+      radial-gradient(100% 80% at 85% 85%, rgba(139,92,246,0.4), transparent 55%),
+      linear-gradient(160deg,#171727,#0c0c16);
+    border:1px solid var(--border);
+    overflow:hidden;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,0.75);
+  }
+  .vf-noise{
+    position:absolute;inset:0;
+    background-image:radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px);
+    background-size:14px 14px;
+    opacity:0.5;
+  }
+  .vf-topbar{
+    position:absolute;top:16px;left:16px;right:16px;
+    display:flex;align-items:center;justify-content:space-between;
+    font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,0.75);
+    letter-spacing:0.05em;
+  }
+  .vf-topbar .rec{display:flex;align-items:center;gap:5px;}
+  .vf-topbar .rec span{width:6px;height:6px;border-radius:50%;background:var(--pink);box-shadow:0 0 8px var(--pink);animation:pulse-dot 1s ease-in-out infinite;}
+
+  .product-silhouette{
+    position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);
+    width:112px;height:112px;color:var(--text);opacity:0.92;
+  }
+
+  .scan-bracket{
+    position:absolute;width:44%;height:34%;left:28%;top:38%;
+    pointer-events:none;
+  }
+  .scan-bracket span{
+    position:absolute;width:24px;height:24px;border-color:var(--lime);
+    filter:drop-shadow(0 0 6px rgba(195,255,61,0.7));
+  }
+  .scan-bracket span:nth-child(1){top:0;left:0;border-top:3px solid var(--lime);border-left:3px solid var(--lime);border-radius:6px 0 0 0;}
+  .scan-bracket span:nth-child(2){top:0;right:0;border-top:3px solid var(--lime);border-right:3px solid var(--lime);border-radius:0 6px 0 0;}
+  .scan-bracket span:nth-child(3){bottom:0;left:0;border-bottom:3px solid var(--lime);border-left:3px solid var(--lime);border-radius:0 0 0 6px;}
+  .scan-bracket span:nth-child(4){bottom:0;right:0;border-bottom:3px solid var(--lime);border-right:3px solid var(--lime);border-radius:0 0 6px 0;}
+
+  .scan-line{
+    position:absolute;left:6%;right:6%;height:2px;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+    box-shadow:0 0 14px 2px rgba(61,232,255,0.7);
+    animation:scanmove 2.6s cubic-bezier(.65,0,.35,1) infinite;
+  }
+  @keyframes scanmove{
+    0%{top:12%;}
+    50%{top:88%;}
+    100%{top:12%;}
+  }
+
+  .id-tag{
+    position:absolute;left:50%;bottom:16%;transform:translateX(-50%);
+    background:rgba(10,10,18,0.88);
+    border:1px solid rgba(195,255,61,0.4);
+    border-radius:10px;padding:8px 12px;
+    font-family:var(--font-mono);font-size:11px;color:var(--lime);
+    white-space:nowrap;
+    display:flex;align-items:center;gap:8px;
+    animation:tagfloat 3.2s ease-in-out infinite;
+  }
+  @keyframes tagfloat{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,-5px);}}
+  .id-tag b{color:var(--text);font-weight:600;}
+
+  .vf-platform-chip{
+    position:absolute;bottom:16px;left:16px;right:16px;
+    display:flex;align-items:center;justify-content:space-between;
+    font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,0.55);
+  }
+
+  @media (max-width:900px){
+    .hero-inner{grid-template-columns:1fr;}
+    .hero-visual{order:-1;margin-bottom:12px;}
+    .viewfinder{max-width:260px;}
+  }
+
+  /* ===== SECTION SHARED ===== */
+  section{position:relative;z-index:1;padding:90px 0;}
+  .section-head{max-width:600px;margin:0 auto 52px;text-align:center;}
+  .section-eyebrow{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--text-faint);margin-bottom:12px;display:block;
+  }
+  h2.section-title{
+    font-family:var(--font-display);font-weight:700;
+    font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.015em;margin-bottom:14px;
+  }
+  .section-desc{color:var(--text-dim);font-size:16px;}
+
+  /* ===== HOW IT WORKS ===== */
+  .steps{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
+    max-width:1000px;margin:0 auto;
+  }
+  .step-card{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-md);padding:30px 26px;
+    position:relative;overflow:hidden;
+    transition:transform .2s ease, border-color .2s ease;
+  }
+  .step-card:hover{transform:translateY(-4px);border-color:rgba(195,255,61,0.35);}
+  .step-num{
+    font-family:var(--font-mono);font-size:13px;color:var(--lime);
+    display:flex;align-items:center;gap:10px;margin-bottom:22px;
+  }
+  .step-num::after{content:'';flex:1;height:1px;background:var(--border);}
+  .step-icon{
+    width:46px;height:46px;border-radius:13px;
+    background:var(--grad-viral-soft);
+    display:flex;align-items:center;justify-content:center;margin-bottom:18px;
+  }
+  .step-icon svg{width:22px;height:22px;color:var(--text);}
+  .step-card h3{font-family:var(--font-display);font-size:19px;margin-bottom:8px;font-weight:600;}
+  .step-card p{color:var(--text-dim);font-size:14.5px;}
+
+  @media (max-width:760px){.steps{grid-template-columns:1fr;}}
+
+  /* ===== PLATFORMS ===== */
+  .platform-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:18px;max-width:900px;margin:0 auto;
+  }
+  .platform-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+    padding:26px 16px;text-align:center;transition:transform .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .platform-card:hover{transform:translateY(-4px);border-color:var(--border);background:var(--surface-2);}
+  .platform-card .picon{width:38px;height:38px;margin:0 auto 14px;}
+  .platform-card span{font-size:13.5px;font-weight:600;color:var(--text-dim);}
+
+  @media (max-width:700px){.platform-grid{grid-template-columns:repeat(2,1fr);}}
+
+  /* ===== EXAMPLE DISCOVERY ===== */
+  .example-panel{
+    max-width:960px;margin:0 auto;
+    background:linear-gradient(160deg, var(--surface), var(--surface-2));
+    border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:8px;overflow:hidden;box-shadow:var(--shadow-card);
+  }
+  .example-flow{
+    display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;align-items:center;
+    padding:34px 28px;
+  }
+  .ex-node{text-align:center;padding:14px;}
+  .ex-node .ex-icon{
+    width:64px;height:64px;border-radius:16px;margin:0 auto 14px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--surface-3);border:1px solid var(--border);
+  }
+  .ex-node .ex-icon svg{width:28px;height:28px;}
+  .ex-node h4{font-family:var(--font-display);font-size:15px;font-weight:600;margin-bottom:6px;}
+  .ex-node p{font-size:12.5px;color:var(--text-faint);line-height:1.4;}
+  .ex-arrow{color:var(--text-faint);width:22px;height:22px;}
+  .ex-result{
+    background:var(--surface-3);border:1px solid rgba(195,255,61,0.25);
+    border-radius:13px;padding:14px;
+  }
+  .ex-result .ex-price{font-family:var(--font-mono);color:var(--lime);font-size:13px;margin-top:2px;}
+
+  @media (max-width:800px){
+    .example-flow{grid-template-columns:1fr;}
+    .ex-arrow{transform:rotate(90deg);margin:4px auto;}
+  }
+
+  /* ===== FOOTER ===== */
+  footer{
+    border-top:1px solid var(--border-soft);
+    padding:56px 0 28px;position:relative;z-index:1;
+  }
+  .footer-grid{
+    display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:40px;margin-bottom:44px;
+  }
+  .footer-brand p{color:var(--text-faint);font-size:13.5px;margin-top:14px;max-width:260px;line-height:1.6;}
+  .footer-col h5{font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:16px;}
+  .footer-col a{display:block;font-size:14px;color:var(--text-dim);margin-bottom:11px;transition:color .15s ease;}
+  .footer-col a:hover{color:var(--text);}
+  .footer-bottom{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+    padding-top:24px;border-top:1px solid var(--border-soft);
+    font-size:12.5px;color:var(--text-faint);
+  }
+  @media (max-width:760px){.footer-grid{grid-template-columns:1fr 1fr;}}
+
+  /* ===== SCANNING VIEW ===== */
+  .scan-view{padding:70px 0 100px;min-height:60vh;}
+  .scan-stage{
+    max-width:560px;margin:0 auto;text-align:center;
+  }
+  .scan-orb{
+    position:relative;width:180px;height:180px;margin:0 auto 40px;
+  }
+  .scan-orb .ring{
+    position:absolute;inset:0;border-radius:50%;
+    border:2px solid transparent;
+    border-top-color:var(--lime);border-right-color:var(--cyan);
+    animation:spin 1.4s linear infinite;
+  }
+  .scan-orb .ring2{
+    position:absolute;inset:18px;border-radius:50%;
+    border:2px solid transparent;border-bottom-color:var(--pink);border-left-color:var(--violet);
+    animation:spin 2s linear infinite reverse;
+  }
+  .scan-orb .core{
+    position:absolute;inset:44px;border-radius:50%;
+    background:var(--surface-2);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .scan-orb .core svg{width:38px;height:38px;color:var(--lime);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .scan-status{
+    font-family:var(--font-display);font-weight:700;font-size:24px;margin-bottom:10px;
+    min-height:32px;
+  }
+  .scan-substatus{color:var(--text-faint);font-size:14px;font-family:var(--font-mono);margin-bottom:30px;}
+
+  .scan-progress-track{
+    height:6px;border-radius:100px;background:var(--surface-2);border:1px solid var(--border);
+    overflow:hidden;margin-bottom:26px;
+  }
+  .scan-progress-fill{
+    height:100%;width:0%;border-radius:100px;
+    background:var(--grad-viral);
+    transition:width .5s cubic-bezier(.4,0,.2,1);
+  }
+
+  .scan-checklist{display:flex;flex-direction:column;gap:10px;text-align:left;max-width:340px;margin:0 auto;}
+  .scan-checklist li{
+    display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--text-faint);
+    transition:color .3s ease;
+  }
+  .scan-checklist li.done{color:var(--text);}
+  .scan-checklist li .chk{
+    width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);
+    flex:none;display:flex;align-items:center;justify-content:center;transition:all .3s ease;
+  }
+  .scan-checklist li.done .chk{background:var(--lime);border-color:var(--lime);}
+  .scan-checklist li.done .chk svg{width:10px;height:10px;color:#0a0a12;}
+  .scan-checklist li.active .chk{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(61,232,255,0.15);}
+
+  /* ===== RESULT VIEW ===== */
+  .result-view{padding:56px 0 100px;}
+  .result-back{
+    display:inline-flex;align-items:center;gap:8px;color:var(--text-faint);font-size:13.5px;
+    margin-bottom:28px;transition:color .2s ease;
+  }
+  .result-back:hover{color:var(--text);}
+  .result-back svg{width:15px;height:15px;}
+
+  .result-grid{display:grid;grid-template-columns:1fr 1.15fr;gap:44px;margin-bottom:64px;}
+  .result-visual{
+    background:linear-gradient(165deg,var(--surface-2),var(--surface));
+    border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:40px;display:flex;align-items:center;justify-content:center;
+    aspect-ratio:1/0.95;position:relative;overflow:hidden;
+  }
+  .result-visual .glow{position:absolute;width:220px;height:220px;border-radius:50%;filter:blur(60px);opacity:0.5;}
+  .result-visual svg{width:150px;height:150px;color:var(--text);position:relative;z-index:1;}
+  .result-platform-badge{
+    position:absolute;top:18px;left:18px;
+    display:flex;align-items:center;gap:7px;
+    background:rgba(10,10,18,0.7);border:1px solid var(--border);
+    padding:6px 11px;border-radius:100px;font-size:11.5px;color:var(--text-dim);
+    font-family:var(--font-mono);
+  }
+  .result-platform-badge svg{width:13px;height:13px;color:var(--text-dim);}
+
+  .result-info .conf-badge{
+    display:inline-flex;align-items:center;gap:7px;
+    background:rgba(195,255,61,0.1);border:1px solid rgba(195,255,61,0.3);
+    color:var(--lime);font-family:var(--font-mono);font-size:12px;
+    padding:6px 12px;border-radius:100px;margin-bottom:16px;white-space:nowrap;
+  }
+  .result-info .conf-badge svg{width:13px;height:13px;flex:none;}
+  .result-info .cat-tag{
+    display:inline-flex;color:var(--text-faint);font-size:12px;font-family:var(--font-mono);
+    margin-bottom:16px;margin-left:8px;
+  }
+  h1.result-title{
+    font-family:var(--font-display);font-weight:700;font-size:clamp(30px,4vw,42px);
+    letter-spacing:-0.015em;margin-bottom:16px;
+  }
+  .result-desc{color:var(--text-dim);font-size:16px;margin-bottom:28px;line-height:1.6;}
+
+  .info-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+    padding:24px;margin-bottom:16px;
+  }
+  .info-card h4{
+    display:flex;align-items:center;gap:9px;font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:10px;
+  }
+  .info-card h4 svg{width:18px;height:18px;color:var(--lime);}
+  .info-card p{color:var(--text-dim);font-size:14.5px;line-height:1.6;}
+  .clue-list{display:flex;flex-direction:column;gap:9px;margin-top:6px;}
+  .clue-list li{
+    display:flex;gap:10px;font-size:13.5px;color:var(--text-dim);line-height:1.5;
+  }
+  .clue-list li::before{
+    content:'';flex:none;width:6px;height:6px;border-radius:50%;
+    background:var(--cyan);margin-top:6px;box-shadow:0 0 6px var(--cyan);
+  }
+
+  @media (max-width:860px){.result-grid{grid-template-columns:1fr;}}
+
+  .info-card.unsure{
+    background:rgba(255,183,61,0.06);
+    border-color:rgba(255,183,61,0.28);
+  }
+  .info-card.unsure h4{color:#ffb73d;}
+  .info-card.unsure h4 svg{color:#ffb73d;}
+
+  .price-estimate{
+    background:var(--surface-2);border:1px solid var(--border);
+    border-radius:var(--radius-md);padding:16px 18px;margin-bottom:14px;
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;
+  }
+  .price-estimate .pe-label{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:13px;color:var(--text-dim);
+  }
+  .price-estimate .pe-label svg{width:14px;height:14px;color:var(--lime);}
+  .price-estimate .pe-value{
+    font-family:var(--font-display);font-weight:700;font-size:24px;color:var(--lime);
+  }
+  .price-estimate .pe-caveat{
+    flex-basis:100%;display:flex;align-items:flex-start;gap:7px;
+    font-size:11.5px;color:var(--text-faint);line-height:1.45;
+  }
+  .price-estimate .pe-caveat svg{width:13px;height:13px;flex:none;margin-top:2px;}
+
+  .search-refine{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+    padding:16px 18px;margin-bottom:20px;
+  }
+  .search-refine label{
+    display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin-bottom:10px;
+  }
+  .search-refine label svg{width:14px;height:14px;color:var(--lime);}
+  .search-refine input{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+    color:var(--text);font-family:var(--font-body);font-size:16px;font-weight:600;padding:12px 14px;
+  }
+  .search-refine input:focus{outline:none;border-color:var(--lime);}
+  .search-refine p{font-size:12px;color:var(--text-faint);margin-top:8px;line-height:1.45;}
+
+  .buy-section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px;}
+  .buy-section-head h3{font-family:var(--font-display);font-size:22px;font-weight:700;}
+  .buy-section-head span{color:var(--text-faint);font-size:13px;font-family:var(--font-mono);}
+
+  .supplier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .supplier-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+    padding:22px;display:flex;flex-direction:column;gap:14px;
+    transition:transform .2s ease, border-color .2s ease;
+  }
+  .supplier-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,0.4);}
+  .supplier-thumb{
+    height:110px;border-radius:12px;background:var(--surface-3);
+    display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
+  }
+  .supplier-thumb svg{width:46px;height:46px;color:var(--text-faint);}
+  .store-tile{
+    flex-direction:column;gap:10px;
+    background:
+      radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--store) 26%, transparent), transparent 70%),
+      var(--surface-3);
+    border:1px solid color-mix(in srgb, var(--store) 35%, transparent);
+  }
+  .store-tile .store-mark{
+    width:46px;height:46px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    background:color-mix(in srgb, var(--store) 16%, transparent);
+    color:var(--store);
+  }
+  .store-tile .store-mark svg{width:26px;height:26px;color:var(--store);}
+  .store-tile .store-name{
+    font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.04em;
+    color:var(--store);font-weight:600;
+  }
+  .view-product-btn{border-color:color-mix(in srgb, var(--store, var(--border)) 40%, transparent);}
+  .view-product-btn:hover{
+    background:color-mix(in srgb, var(--store, var(--surface-3)) 16%, transparent);
+    border-color:var(--store, var(--text-faint));
+  }
+  .supplier-store{
+    position:absolute;top:9px;left:9px;font-family:var(--font-mono);font-size:10px;
+    color:var(--text-dim);background:rgba(10,10,18,0.7);padding:4px 8px;border-radius:100px;border:1px solid var(--border);
+  }
+  .supplier-card h5{font-size:15px;font-weight:600;line-height:1.35;}
+  .supplier-meta{display:flex;align-items:center;justify-content:space-between;font-size:13px;}
+  .supplier-price{font-family:var(--font-mono);font-weight:600;color:var(--lime);font-size:16px;}
+  .supplier-rating{display:flex;align-items:center;gap:4px;color:var(--text-dim);}
+  .supplier-rating svg{width:13px;height:13px;color:#ffcc4d;}
+  .supplier-ship{color:var(--text-faint);font-size:12.5px;display:flex;align-items:center;gap:6px;}
+  .supplier-ship svg{width:13px;height:13px;}
+  .view-product-btn{
+    margin-top:auto;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--surface-3);border:1px solid var(--border);
+    color:var(--text);font-weight:600;font-size:13.5px;
+    padding:11px;border-radius:11px;transition:all .18s ease;
+  }
+  .view-product-btn:hover{background:var(--grad-viral);border-color:transparent;}
+  .view-product-btn svg{width:14px;height:14px;}
+
+  @media (max-width:900px){.supplier-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:600px){.supplier-grid{grid-template-columns:1fr;}}
+
+  .rescan-cta{
+    text-align:center;margin-top:52px;padding-top:44px;border-top:1px solid var(--border-soft);
+  }
+  .rescan-cta p{color:var(--text-faint);font-size:14px;margin-bottom:16px;}
+  .rescan-btn{
+    display:inline-flex;align-items:center;gap:9px;
+    background:var(--text);color:#0a0a12;font-weight:700;font-size:14.5px;
+    padding:13px 24px;border-radius:100px;border:none;transition:transform .18s ease;
+  }
+  .rescan-btn:hover{transform:translateY(-1px);}
+  .rescan-btn svg{width:16px;height:16px;}
+
+  /* ===== ERROR VIEW ===== */
+  .error-view{padding:90px 0;text-align:center;}
+  .error-icon{
+    width:76px;height:76px;border-radius:22px;margin:0 auto 26px;
+    background:rgba(255,62,127,0.1);border:1px solid rgba(255,62,127,0.3);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .error-icon svg{width:34px;height:34px;color:var(--pink);}
+  .error-view h2{font-family:var(--font-display);font-size:26px;margin-bottom:12px;}
+  .error-view p{color:var(--text-dim);max-width:420px;margin:0 auto 28px;}
+
+  .fade-in{animation:fadeIn .5s ease both;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;}
+  }
+
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="logo">
+      <span class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3M20 16v3a1 1 0 01-1 1h-3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="#fff" stroke-width="2"/></svg>
+      </span>
+      <span>AI Viral Product Finder<span class="logo-sub">Snap it · Scan it · Buy it</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#top">Home</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#discover">Discover</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#about">About</a>
+    </div>
+    <span class="usage-pill" id="usagePill"></span>
+    <button class="nav-cta desktop-only" id="navScanBtn" type="button">Scan a Photo</button>
+    <button class="nav-burger" id="burgerBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#top">Home</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#discover">Discover</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#about">About</a>
+    <button class="nav-cta" id="navScanBtnMobile" type="button" style="width:100%;justify-content:center;">Scan a Photo</button>
+  </div>
+</nav>
+
+<main id="mainContent"></main>
+
+<div class="modal-overlay" id="upgradeModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<footer id="about">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <span class="logo-mark">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#fff" stroke-width="2"/></svg>
+          </span>
+          <span>AI Viral Product Finder</span>
+        </div>
+        <p>Upload a photo or a screenshot of anything you spotted, and our AI identifies the product, explains what it does, and finds places to buy it — in seconds.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Navigate</h5>
+        <a href="#top">Home</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#discover">Discover</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#about">About</a>
+      </div>
+      <div class="footer-col">
+        <h5>Works with</h5>
+        <a href="#top">Camera photos</a>
+        <a href="#top">Phone screenshots</a>
+        <a href="#top">Video frames</a>
+        <a href="#top">Saved images</a>
+      </div>
+      <div class="footer-col">
+        <h5>Legal</h5>
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2026 AI Viral Product Finder. All rights reserved.</span>
+      <span>Built for discovering what the internet is obsessed with.</span>
+    </div>
+  </div>
+</footer>
+<script>
+/* =========================================================================
+   AI VIRAL PRODUCT FINDER
+   Photo-only product identification. There is no link/URL input anywhere in
+   this app: a browser cannot fetch or read third-party video pages, so the
+   only honest input is an image the user supplies from their own device
+   (camera, gallery, screenshot, or clipboard).
+
+   Sections below, in order:
+     1. CONFIG          — the few values you may want to change
+     2. UTILITIES       — escaping, storage, small helpers
+     3. IMAGE INTAKE    — file/camera -> normalized, downscaled JPEG data URL
+     4. IDENTIFY        — the vision API call (direct, or via your backend)
+     5. SEARCH LINKS    — real marketplace search URLs
+     6. SUBSCRIPTION    — plans, usage metering, checkout
+     7. ICONS
+     8. STATE + VIEW    — single entry point for swapping screens
+     9. VIEWS           — home, scanning, result, error, pricing, modal
+    10. HOME BINDINGS   — all event wiring for the home screen
+    11. GLOBAL + INIT
+   ========================================================================= */
+
+/* =========================================================================
+   1. CONFIG
+   ========================================================================= */
+const CONFIG = {
+  /* The app sends photos to server.py, which holds the Gemini key and talks
+     to Google. No key ever exists in this page, so visitors use yours without
+     being able to see or copy it. Open the app through the server
+     (http://localhost:8000), not by double-clicking this file.
+
+     Set to null to go back to the old in-browser mode, where each visitor
+     pastes their own key into the page. */
+  backendEndpoint: '/api/identify',
+
+  openaiModel: 'gpt-4o-mini',   // used when the pasted key is an OpenAI key
+
+  /* Gemini model names change every few months, so nothing is hardcoded here:
+     the app asks Google which models the key can actually use and picks the
+     best vision-capable Flash one, caching the answer. */
+  geminiApiBase: 'https://generativelanguage.googleapis.com/v1beta',
+
+  maxImageEdge: 1280,        // longest side sent to the model, in px
+  jpegQuality: 0.85,
+  maxUploadBytes: 25 * 1024 * 1024,   // reject absurd files before decoding
+  maxPayloadBytes: 4 * 1024 * 1024,   // re-compress until the data URL fits
+  keyStorage: 'ovf_api_key',
+  geminiModelStorage: 'ovf_gemini_model',
+  subStorage: 'ovf_subscription',
+};
+
+/* =========================================================================
+   2. UTILITIES
+   ========================================================================= */
+
+/** Model output and file names are untrusted text — never inject them raw. */
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** localStorage throws in private mode / blocked-cookie contexts. */
+const store = {
+  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } },
+  remove(key) { try { localStorage.removeItem(key); } catch {} },
+};
+
+const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/** Rough byte size of a base64 data URL. */
+function dataUrlBytes(dataUrl) {
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  return Math.round(base64.length * 0.75);
+}
+
+/**
+ * Which service a pasted key belongs to. OpenAI keys start with "sk-";
+ * anything else is assumed to be Google, which is the free default.
+ *
+ * Deliberately NOT a strict prefix whitelist. Google keys normally start with
+ * "AIza", but key formats change, and the only authority on whether a key is
+ * valid is the provider itself — a rejected key produces a clear message from
+ * the API. Refusing to even try is worse than trying and reporting the error.
+ */
+function detectKeyProvider(key) {
+  const k = String(key || '').trim();
+  if (!k) return null;
+  if (k.startsWith('sk-')) return 'openai';
+  return 'gemini';
+}
+
+/**
+ * Catch the things people paste by mistake instead of a key. The Google AI
+ * Studio page shows a project name, a project number and the key close
+ * together, so grabbing the wrong one is easy — say which one they grabbed
+ * rather than a generic "invalid key".
+ * Returns a help message, or null when the value looks usable.
+ */
+function keyPasteProblem(key) {
+  const k = String(key || '').trim();
+
+  if (!k) return 'Paste your API key first.';
+  if (/\s/.test(k)) return 'That has spaces or line breaks in it, so it is not a key. Copy just the single long line of letters and numbers.';
+  if (k.endsWith('.apps.googleusercontent.com')) return 'That is an OAuth client ID, not an API key. Go back and copy the value from the API key column instead.';
+  if (k.includes('@')) return 'That looks like an email or service account address, not an API key.';
+  if (/^gen-lang-client-/.test(k) || /^[a-z]+-[a-z]+-\d+$/.test(k)) return 'That is the project name, not the key. The key is the long code in the same row, usually hidden behind a "Show" or copy button.';
+  if (/^\d+$/.test(k)) return 'That is the project number, not the key. The key is a long mix of letters and numbers.';
+  if (k.startsWith('ya29.')) return 'That is a temporary access token, not an API key. Create a proper API key instead.';
+  if (k.length < 20) return `That is too short to be an API key (only ${k.length} characters). Keys are around 40 characters long.`;
+  return null;
+}
+
+/**
+ * Rank a Gemini model name for this job: a current, general-purpose Flash
+ * model. Negative means unusable here (embeddings, image generation, audio).
+ */
+function scoreGeminiModel(name) {
+  if (/embed|aqa|imagen|veo|tts|audio|live|image-generation|vision-latest/i.test(name)) return -1;
+  let score = 0;
+  if (/flash/i.test(name)) score += 100;
+  else if (/pro/i.test(name)) score += 40;
+  if (/lite/i.test(name)) score -= 25;          // cheaper but weaker at fine detail
+  if (/thinking/i.test(name)) score -= 30;      // burns the token budget reasoning first
+  if (/latest/i.test(name)) score += 30;        // tracks Google's current pick
+  if (/preview|exp\b/i.test(name)) score -= 15;
+  const version = parseFloat((name.match(/(\d+(?:\.\d+)?)/) || [])[1] || 0);
+  score += version * 2;                          // newer generation wins ties
+  return score;
+}
+
+const IS_MOBILE =
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform));
+
+/** In-page live camera needs getUserMedia AND a secure context (https/localhost). */
+function canUseLiveCamera() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.isSecureContext);
+}
+
+/* =========================================================================
+   3. IMAGE INTAKE
+   Everything the user can hand us — a gallery pick, a camera capture, a
+   drag-drop, a clipboard paste — funnels through here and comes out as a
+   normalized, downscaled JPEG data URL. This is what makes phone photos
+   usable: a 12MP iPhone shot is ~4MB of HEIC/JPEG, far too big to base64
+   into an API request, so it is re-drawn onto a canvas at maxImageEdge.
+   ========================================================================= */
+
+/** Decode a File into something drawable, preserving EXIF rotation. */
+async function decodeImageFile(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return { source: await createImageBitmap(file, { imageOrientation: 'from-image' }), release() { this.source.close && this.source.close(); } };
+    } catch {
+      try {
+        return { source: await createImageBitmap(file), release() { this.source.close && this.source.close(); } };
+      } catch { /* fall through to the <img> path below */ }
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error('decode-failed'));
+    el.src = objectUrl;
+  }).catch(err => { URL.revokeObjectURL(objectUrl); throw err; });
+
+  return { source: img, release() { URL.revokeObjectURL(objectUrl); } };
+}
+
+/** Draw any drawable source onto a canvas, capped at CONFIG.maxImageEdge. */
+function drawScaled(source, srcW, srcH) {
+  if (!srcW || !srcH) throw new Error('decode-failed');
+
+  const scale = Math.min(1, CONFIG.maxImageEdge / Math.max(srcW, srcH));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(srcW * scale));
+  canvas.height = Math.max(1, Math.round(srcH * scale));
+
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';           // PNG screenshots can be transparent
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/** Encode, stepping quality down until the payload is a sane size. */
+function encodeCanvas(canvas) {
+  let quality = CONFIG.jpegQuality;
+  let dataUrl = canvas.toDataURL('image/jpeg', quality);
+  while (dataUrlBytes(dataUrl) > CONFIG.maxPayloadBytes && quality > 0.4) {
+    quality -= 0.15;
+    dataUrl = canvas.toDataURL('image/jpeg', quality);
+  }
+  return dataUrl;
+}
+
+const ImageIntake = {
+  /** Throws Error with a user-readable message; callers show err.message. */
+  async fromFile(file) {
+    if (!file) throw new Error('No image was selected. Try again.');
+
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) ||
+                           /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(file.name || '');
+    if (!looksLikeImage) {
+      throw new Error('That is not an image file. Pick a JPG, PNG, WEBP, or HEIC photo.');
+    }
+    if (file.size > CONFIG.maxUploadBytes) {
+      throw new Error('That image is enormous (' + formatBytes(file.size) + '). Try one under 25MB.');
+    }
+
+    let decoded;
+    try {
+      decoded = await decodeImageFile(file);
+    } catch {
+      if (/heic|heif/i.test(file.type + ' ' + (file.name || ''))) {
+        throw new Error('This browser cannot open HEIC photos. On iPhone: Settings > Camera > Formats > Most Compatible, or share the photo as JPEG first.');
+      }
+      throw new Error('That image could not be opened. Try a different photo.');
+    }
+
+    try {
+      const src = decoded.source;
+      const canvas = drawScaled(src, src.naturalWidth || src.width, src.naturalHeight || src.height);
+      const dataUrl = encodeCanvas(canvas);
+      return {
+        dataUrl,
+        name: file.name || 'photo.jpg',
+        width: canvas.width,
+        height: canvas.height,
+        bytes: dataUrlBytes(dataUrl),
+      };
+    } finally {
+      try { decoded.release(); } catch {}
+    }
+  },
+
+  /** Camera capture path: a live <video> frame straight to canvas. */
+  fromVideoFrame(video) {
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error('The camera is still starting up. Give it a second and try again.');
+    }
+    const canvas = drawScaled(video, video.videoWidth, video.videoHeight);
+    const dataUrl = encodeCanvas(canvas);
+    return {
+      dataUrl,
+      name: 'Photo from camera',
+      width: canvas.width,
+      height: canvas.height,
+      bytes: dataUrlBytes(dataUrl),
+    };
+  },
+};
+
+/* =========================================================================
+   4. IDENTIFY
+   One service, two transports: your own backend (preferred) or a direct
+   browser -> OpenAI call using a key the visitor supplies.
+   ========================================================================= */
+const IDENTIFY_PROMPT = `You are a product-identification assistant. Look at this image and identify the single main consumer product shown.
+
+Be as SPECIFIC as the image honestly allows. Include the brand, model, generation, size or variant whenever they are visible or can be reasonably inferred from design details — "iPhone 15 Pro Max" is a far better answer than "smartphone", and "Sony WH-1000XM5" beats "headphones". Do not pad the name with a generation you cannot actually support; say what you can defend and put the rest in notSureAbout.
+
+Respond with ONLY raw JSON (no markdown fences, no commentary) matching exactly this shape:
+{
+  "name": "the most specific product name the image supports",
+  "brand": "the brand or maker if visible or clearly recognisable from the design (e.g. \"Apple\"), otherwise null",
+  "category": "one or two word category",
+  "confidence": <integer 0-100, your genuine confidence>,
+  "description": "one sentence describing what the item is",
+  "whatItDoes": "2-3 sentences on what it's used for and why someone would want it",
+  "clues": ["visual clue 1", "visual clue 2", "visual clue 3"],
+  "priceRange": "typical retail range for this kind of item, e.g. \"$15-30\", or null if you genuinely cannot say",
+  "buyingTips": ["what to check before buying one", "a second thing worth checking"],
+  "notSureAbout": "if you could not pin down the exact generation, size, colourway or variant, say plainly what you could not tell AND how the owner could check it themselves (a marking on the item, a settings screen, a serial number). Use null if you are confident you identified the exact variant.",
+  "searchQuery": "a DETAILED shopping search query, written the way this item would be titled in an Amazon listing — see rules below"
+}
+
+Rules for searchQuery:
+- Always start with the brand when you know it. Never drop the brand to make the query generic.
+- Include the model name or number, and every spec you can see or confidently infer: wattage, connector type (USB-C, Lightning, MagSafe), capacity, size, generation, colour, material.
+- Aim for 4-10 words. A generic query sends the shopper to thousands of unrelated results.
+- Good: "Apple 20W USB-C Power Adapter white". Bad: "usb power adapter".
+- Good: "Stanley Quencher H2.0 40 oz tumbler cream". Bad: "insulated cup".
+If you cannot identify a clear product, set "name" to null and briefly explain why in "description".`;
+
+const IDENTIFY_STEPS = [
+  { label: 'Reading your photo…',        sub: 'Preparing the image' },
+  { label: 'Finding the product…',       sub: 'Isolating the main object' },
+  { label: 'Identifying the best match…', sub: 'Asking the vision model' },
+  { label: 'Finding places to buy it…',  sub: 'Building live search links' },
+  { label: 'Product found!',                  sub: 'Preparing your results' },
+];
+
+const IdentifyService = {
+  steps: IDENTIFY_STEPS,
+
+  /**
+   * identify(photo, apiKey, onStep) -> normalized product object.
+   * onStep(index, total, step) drives the progress UI.
+   */
+  async identify(photo, apiKey, onStep) {
+    const total = IDENTIFY_STEPS.length;
+
+    onStep(0, total, IDENTIFY_STEPS[0]);
+    await sleep(350);
+    onStep(1, total, IDENTIFY_STEPS[1]);
+    await sleep(350);
+    onStep(2, total, IDENTIFY_STEPS[2]);
+
+    let raw;
+    if (CONFIG.backendEndpoint)                        raw = await this._viaBackend(photo.dataUrl);
+    else if (detectKeyProvider(apiKey) === 'gemini')   raw = await this._viaGemini(photo.dataUrl, apiKey, (s) => onStep(2, total, s));
+    else                                               raw = await this._viaOpenAI(photo.dataUrl, apiKey);
+
+    onStep(3, total, IDENTIFY_STEPS[3]);
+    await sleep(300);
+
+    const parsed = this._parse(raw);
+    if (!parsed.name) {
+      throw new Error(parsed.description || 'We could not confidently identify a product in that photo. Try a clearer, closer shot.');
+    }
+
+    onStep(4, total, IDENTIFY_STEPS[4]);
+    await sleep(350);
+
+    return {
+      id: 'live-' + Date.now(),
+      name: parsed.name,
+      category: parsed.category || 'Product',
+      confidence: Math.max(0, Math.min(100, parseInt(parsed.confidence, 10) || 70)),
+      description: parsed.description || '',
+      whatItDoes: parsed.whatItDoes || '',
+      clues: Array.isArray(parsed.clues) ? parsed.clues.filter(Boolean).slice(0, 6) : [],
+      priceRange: parsed.priceRange || '',
+      buyingTips: Array.isArray(parsed.buyingTips) ? parsed.buyingTips.filter(Boolean).slice(0, 4) : [],
+      notSureAbout: parsed.notSureAbout || '',
+      brand: GENERIC_BRANDS.test(String(parsed.brand || '')) ? '' : (parsed.brand || ''),
+      searchQuery: buildSearchQuery(parsed),
+      image: photo.dataUrl,
+    };
+  },
+
+  /** Preferred path once you have a server. Key never reaches the browser. */
+  async _viaBackend(imageDataUrl) {
+    // The commonest mistake: opening the HTML by double-click or Live Server,
+    // where there is no /api/identify to call. Say exactly how to fix it.
+    const notRunning = 'The app server isn\'t running here. Double-click "start-server.command" '
+      + '(or run python3 server.py) and use the page it opens at http://localhost:8000.';
+    if (location.protocol === 'file:') throw new Error(notRunning);
+
+    let res;
+    try {
+      res = await fetch(CONFIG.backendEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageDataUrl }),
+      });
+    } catch {
+      throw new Error('Could not reach the server. Check your connection and try again.');
+    }
+
+    let data = null;
+    try { data = await res.json(); } catch {}
+
+    if (!res.ok) {
+      if (!data && (res.status === 404 || res.status === 405)) throw new Error(notRunning);
+      throw new Error((data && data.error) || `The server returned an error (status ${res.status}). Please try again.`);
+    }
+    if (!data) throw new Error('The server sent back something unreadable. Please try again.');
+    return typeof data === 'string' ? data : JSON.stringify(data);
+  },
+
+  /** Demo/testing path: visitor's own key, direct from the browser. */
+  async _viaOpenAI(imageDataUrl, apiKey) {
+    let res;
+    try {
+      res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey,
+        },
+        body: JSON.stringify({
+          model: CONFIG.openaiModel,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: IDENTIFY_PROMPT },
+              { type: 'image_url', image_url: { url: imageDataUrl } },
+            ],
+          }],
+          max_tokens: 700,
+        }),
+      });
+    } catch {
+      throw new Error('Could not reach OpenAI. Check your internet connection and try again.');
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('That API key was rejected by OpenAI. Double-check it and try again.');
+      if (res.status === 429) throw new Error('OpenAI rate limit or quota reached for this key. Try again in a moment.');
+      if (res.status >= 500) throw new Error('OpenAI is having trouble right now. Try again in a moment.');
+      throw new Error('OpenAI returned an error (status ' + res.status + '). Please try again.');
+    }
+
+    const data = await res.json();
+    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  },
+
+  /**
+   * One request to Google, tried both ways it can be authenticated.
+   *
+   * Google is mid-migration from legacy "AIza" traffic keys to the newer
+   * "AQ." auth keys that AI Studio now issues exclusively, and the two are
+   * not accepted identically across endpoints. The documented header is
+   * x-goog-api-key; if that comes back 401 we retry as a bearer token before
+   * giving up, so a key of either generation has its best shot.
+   */
+  async _geminiFetch(url, apiKey, init) {
+    const opts = init || {};
+    const attempt = (auth) => fetch(url, {
+      ...opts,
+      headers: { ...(opts.headers || {}), ...auth },
+    });
+
+    let res;
+    try {
+      res = await attempt({ 'x-goog-api-key': apiKey });
+    } catch {
+      throw new Error('Could not reach Google. Check your internet connection and try again.');
+    }
+    if (res.status !== 401) return res;
+
+    try {
+      return await attempt({ 'Authorization': `Bearer ${apiKey}` });
+    } catch {
+      throw new Error('Could not reach Google. Check your internet connection and try again.');
+    }
+  },
+
+  /**
+   * Google AI Studio path. Free tier, no card, and CORS-enabled — it works
+   * straight from the browser, including from a file:// page.
+   */
+  async _viaGemini(imageDataUrl, apiKey, onStep, refreshed) {
+    const models = await this._geminiModels(apiKey);
+    const mime = imageDataUrl.slice(5, imageDataUrl.indexOf(';')) || 'image/jpeg';
+    const base64 = imageDataUrl.slice(imageDataUrl.indexOf(',') + 1);
+
+    /* jsonMode asks Gemini to reply as JSON directly, which saves stripping
+       markdown fences — but not every model accepts it, so it is an
+       optimisation we drop rather than a requirement.
+
+       maxOutputTokens is deliberately generous: current Gemini models spend
+       hidden "thinking" tokens out of the same budget, and a tight limit gets
+       spent thinking, returning an empty answer. */
+    const send = (model, jsonMode) => this._geminiFetch(
+      `${CONFIG.geminiApiBase}/models/${model}:generateContent`, apiKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: IDENTIFY_PROMPT },
+            { inlineData: { mimeType: mime, data: base64 } },
+          ]}],
+          generationConfig: {
+            ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+            maxOutputTokens: 4096,
+            temperature: 0.2,
+          },
+        }),
+      });
+
+    /* Google's free tier routinely answers 503 "high demand" on popular
+       models, and 429 when a burst hits the rate limit — both clear on their
+       own. A 500 is ambiguous: it can be capacity, or it can be a request
+       shape the model dislikes. So each model gets three shots: once, once
+       more after a pause, then once without JSON mode. If it is still no
+       good, drop to the next-best model rather than giving up. */
+    const ATTEMPTS = [
+      { json: true,  wait: 0 },
+      { json: true,  wait: 1500 },
+      { json: false, wait: 0 },
+    ];
+
+    const shortlist = models.slice(0, 4);
+    let lastMessage = '';
+    let lastModel = shortlist[0];
+    let retired = 0;
+
+    for (let m = 0; m < shortlist.length; m++) {
+      const model = shortlist[m];
+      lastModel = model;
+
+      if (m > 0 && onStep) {
+        onStep({ label: 'Trying another model…', sub: `${model} — the previous one was not available` });
+      }
+
+      for (let a = 0; a < ATTEMPTS.length; a++) {
+        const { json, wait } = ATTEMPTS[a];
+        if (wait) {
+          if (onStep) onStep({ label: 'Google is busy — retrying…', sub: `Waiting a moment, then asking ${model} again` });
+          await sleep(wait);
+        }
+
+        const res = await send(model, json);
+
+        if (res.status === 404) {
+          retired++;
+          lastMessage = `Model ${model} is no longer available.`;
+          break;                                   // nothing to retry, next model
+        }
+
+        if (!res.ok) {
+          lastMessage = await this._geminiError(res);
+          try { console.warn('[Gemini]', model, 'failed:', res.status, json ? '(json mode)' : '(plain)'); } catch {}
+          continue;                                // pause, then plain mode, then next model
+        }
+
+        const answer = await this._geminiText(res);
+        if (answer.text) {
+          if (m > 0 || a > 0) { try { console.info('[Gemini] succeeded on', model); } catch {} }
+          // Promote whatever actually worked so the next scan starts there.
+          store.set(CONFIG.geminiModelStorage,
+            JSON.stringify(models.slice(m).concat(models.slice(0, m))));
+          return answer.text;
+        }
+
+        lastMessage = answer.finishReason === 'MAX_TOKENS'
+          ? 'The model ran out of room before answering. Try again — if it repeats, the photo may be too complex.'
+          : `The model replied without an answer${answer.finishReason ? ' (' + answer.finishReason + ')' : ''}.`;
+      }
+    }
+
+    // Every cached model has been retired: the list is stale, so rebuild it once.
+    if (retired === shortlist.length && !refreshed) {
+      try { console.warn('[Gemini] cached models all gone — refreshing the list'); } catch {}
+      store.remove(CONFIG.geminiModelStorage);
+      return this._viaGemini(imageDataUrl, apiKey, onStep, true);
+    }
+
+    throw new Error(
+      `${lastMessage || 'Gemini could not be reached.'} `
+      + `Tried ${shortlist.length} model${shortlist.length === 1 ? '' : 's'} (last: ${lastModel}). `
+      + `Google's free tier gets busy at peak times — waiting a minute usually clears it.`
+    );
+  },
+
+  /** Extract the answer, reporting finishReason so an empty one can be explained. */
+  async _geminiText(res) {
+    const data = await res.json();
+    const candidate = data.candidates && data.candidates[0];
+
+    if (!candidate) {
+      const blocked = data.promptFeedback && data.promptFeedback.blockReason;
+      if (blocked) throw new Error(`Google declined to analyze that image (${blocked}). Try a different photo.`);
+      return { text: '', finishReason: '' };
+    }
+    if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'PROHIBITED_CONTENT') {
+      throw new Error('Google blocked that image on safety grounds. Try a different photo.');
+    }
+
+    const text = ((candidate.content && candidate.content.parts) || []).map(part => part.text || '').join('');
+    if (!text.trim()) {
+      try { console.error('[Gemini] empty answer, finishReason =', candidate.finishReason); } catch {}
+      return { text: '', finishReason: candidate.finishReason || '' };
+    }
+    return { text, finishReason: candidate.finishReason || '' };
+  },
+
+  /**
+   * Ask Google which models this key can use, ranked best-first. Beats
+   * hardcoding a name that gets retired, and keeping the whole ranking (not
+   * just the winner) is what lets a busy model fall through to a quieter one.
+   */
+  async _geminiModels(apiKey) {
+    const cached = store.get(CONFIG.geminiModelStorage);
+    if (cached) {
+      try {
+        const list = JSON.parse(cached);
+        if (Array.isArray(list) && list.length) return list;
+      } catch {
+        if (cached && cached.indexOf('{') === -1) return [cached];   // pre-list cache
+      }
+    }
+
+    const res = await this._geminiFetch(`${CONFIG.geminiApiBase}/models`, apiKey);
+    if (!res.ok) throw new Error(await this._geminiError(res));
+
+    const data = await res.json();
+    const ranked = ((data.models) || [])
+      .filter(m => ((m.supportedGenerationMethods) || []).indexOf('generateContent') !== -1)
+      .map(m => String(m.name).replace(/^models\//, ''))
+      .map(name => ({ name, score: scoreGeminiModel(name) }))
+      .filter(entry => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(entry => entry.name);
+
+    if (!ranked.length) {
+      try { console.error('[Gemini] no usable model in', (data.models || []).map(m => m.name)); } catch {}
+      throw new Error('That Google key has no usable model available. Check it at aistudio.google.com/apikey.');
+    }
+
+    try { console.info('[Gemini] ranked models:', ranked.slice(0, 4)); } catch {}
+    store.set(CONFIG.geminiModelStorage, JSON.stringify(ranked));
+    return ranked;
+  },
+
+  /** Turn a Gemini error response into something a person can act on. */
+  async _geminiError(res) {
+    let detail = '', body = null;
+    try { body = await res.json(); detail = (body.error && body.error.message) || ''; } catch {}
+
+    // Whatever else happens, put the raw response somewhere it can be read.
+    try { console.error('[Gemini error]', res.status, body); } catch {}
+
+    if (res.status === 400 && /API key not valid/i.test(detail)) {
+      return 'That Google AI key was rejected. Get a fresh one at aistudio.google.com/apikey.';
+    }
+    if (res.status === 401) {
+      return 'Google would not accept that key. AI Studio now issues new-style keys beginning with "AQ.", and Google is still rolling out support for them — some accounts cannot use them with this API yet. Try creating a fresh key at aistudio.google.com/apikey, or use an OpenAI key instead.';
+    }
+    if (res.status === 403) {
+      return 'Google refused that key. Make sure it was created in Google AI Studio and has no IP or referrer restriction.';
+    }
+    if (res.status === 429) {
+      return "You've hit Gemini's free-tier limit for now (roughly 1,500 scans a day). Wait a few minutes and try again.";
+    }
+    // A 5xx is usually Google, but it is also what they return for a request
+    // shape they dislike — so never hide what they actually said.
+    if (res.status >= 500) {
+      return `Google returned a server error (${res.status})${detail ? ': ' + detail : '. No detail was given.'} If it keeps happening it is the request, not a blip.`;
+    }
+    return `Google returned an error (status ${res.status})${detail ? ': ' + detail : '.'}`;
+  },
+
+  /** Models sometimes wrap JSON in fences or prose — dig it out. */
+  _parse(raw) {
+    let text = String(raw || '').trim()
+      .replace(/^```(?:json)?/i, '')
+      .replace(/```$/, '')
+      .trim();
+
+    try { return JSON.parse(text); } catch {}
+
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try { return JSON.parse(text.slice(start, end + 1)); } catch {}
+    }
+    throw new Error('We got a response back, but could not read it as a product match. Try a clearer photo.');
+  },
+};
+
+/* =========================================================================
+   5. SEARCH LINKS
+   Real, working search URLs — no invented prices or ratings.
+   ========================================================================= */
+/**
+ * The model is asked for a detailed query, but it still sometimes "helpfully"
+ * generalises ("Apple 20W USB-C Power Adapter" -> "usb power adapter"), which
+ * sends people to thousands of unrelated listings. This makes sure the query
+ * is never less specific than the identified name, and always carries the
+ * brand when one was identified.
+ */
+const GENERIC_BRANDS = /^(unknown|generic|unbranded|none|n\/a|no brand|null)$/i;
+
+function tokens(text) {
+  // "USB-C" should match "usb-c", "usb" and "c", so split hyphens too.
+  const out = new Set();
+  String(text || '').toLowerCase().split(/[\s,/()]+/).filter(Boolean).forEach(word => {
+    out.add(word);
+    word.split('-').filter(Boolean).forEach(part => out.add(part));
+  });
+  return out;
+}
+
+function buildSearchQuery({ searchQuery, name, brand }) {
+  const clean = (v) => String(v || '').replace(/["\u201C\u201D]/g, '').replace(/\s+/g, ' ').trim();
+  const nameText = clean(name);
+  const brandText = GENERIC_BRANDS.test(clean(brand)) ? '' : clean(brand);
+  let query = clean(searchQuery) || nameText;
+
+  // Every word of the identified name must survive into the query.
+  const queryTokens = tokens(query);
+  const missingFromQuery = nameText.split(' ').filter(word => {
+    const parts = tokens(word);
+    return [...parts].some(part => !queryTokens.has(part));
+  });
+  if (missingFromQuery.length) {
+    const nameTokens = tokens(nameText);
+    const extras = query.split(' ').filter(word => [...tokens(word)].some(part => !nameTokens.has(part)));
+    query = [nameText, ...extras].join(' ');
+  }
+
+  if (brandText && !tokens(query).has(brandText.toLowerCase().split(' ')[0])) {
+    query = `${brandText} ${query}`;
+  }
+
+  return query.split(' ').slice(0, 14).join(' ');
+}
+
+/**
+ * Each store gets its own mark and colour rather than a fourth copy of the
+ * user's photo. Real listing thumbnails would need a shopping API and a
+ * server — Amazon and Etsy block cross-origin reads from a page like this —
+ * so the honest thing is to show whose search you are about to open, and
+ * what that particular store is good for.
+ */
+const STORES = {
+  amazon: {
+    name: 'Amazon',
+    color: '#FF9900',
+    note: 'Widest selection and the fastest shipping. Best for the mainstream version of this.',
+    search: q => `https://www.amazon.com/s?k=${q}`,
+    mark: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 31c5 4.2 11 6 16 6s11-1.8 16-6" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M35 29.5l5.5 1.2-1.6 5.4" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 22V13a5 5 0 0110 0v9M14 18h10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 22V13" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  },
+  etsy: {
+    name: 'Etsy',
+    color: '#F1641E',
+    note: 'Handmade, vintage and small-batch makers. Best if you want a one-of-a-kind version.',
+    search: q => `https://www.etsy.com/search?q=${q}`,
+    mark: `<svg viewBox="0 0 48 48" fill="none"><path d="M17 11h16M17 11v26h17M17 24h12" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M33 33v4" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/></svg>`,
+  },
+  google: {
+    name: 'Google Shopping',
+    color: '#4285F4',
+    note: 'Compares the price across many shops at once. Start here to see who is cheapest.',
+    search: q => `https://www.google.com/search?tbm=shop&q=${q}`,
+    mark: `<svg viewBox="0 0 48 48" fill="none"><path d="M24 12a12 12 0 1011.3 16" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><path d="M24 24h12" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><circle cx="24" cy="24" r="2.6" fill="currentColor"/></svg>`,
+  },
+  walmart: {
+    name: 'Walmart',
+    color: '#0071CE',
+    note: 'Usually the cheaper end, and you can often collect it in a store the same day.',
+    search: q => `https://www.walmart.com/search?q=${q}`,
+    mark: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M24 7v11M24 30v11M9.5 15.5l9.5 5.5M29 27l9.5 5.5M38.5 15.5L29 21M19 27l-9.5 5.5"/></svg>`,
+  },
+};
+
+function buildSearchLinks(query) {
+  const q = encodeURIComponent(query);
+  return Object.keys(STORES).map(key => {
+    const store = STORES[key];
+    return { key, store: store.name, color: store.color, note: store.note, mark: store.mark, url: store.search(q) };
+  });
+}
+
+/* =========================================================================
+   6. SUBSCRIPTION
+   Plans, usage metering, checkout. Persists to localStorage and simulates
+   checkout so the whole flow is testable without a backend.
+   ========================================================================= */
+const PLANS = {
+  free: {
+    id: 'free', name: 'Free', tagline: 'Try it out and see what it can do.',
+    priceMonthly: 0, priceYearly: 0, scanLimit: 3,
+    features: [
+      { text: '3 photo scans per month', on: true },
+      { text: 'AI product identification', on: true },
+      { text: 'Search links to major stores', on: true },
+      { text: 'Scan history', on: false },
+      { text: 'Priority AI model (GPT-4o)', on: false },
+    ],
+  },
+  pro: {
+    id: 'pro', name: 'Pro', tagline: 'For people who find things constantly.',
+    priceMonthly: 9, priceYearly: 79, scanLimit: Infinity, featured: true,
+    features: [
+      { text: 'Unlimited photo scans', on: true },
+      { text: 'AI product identification', on: true },
+      { text: 'Search links to major stores', on: true },
+      { text: 'Full scan history', on: true },
+      { text: 'Priority AI model (GPT-4o)', on: true },
+    ],
+  },
+  business: {
+    id: 'business', name: 'Business', tagline: 'For resellers and sourcing teams.',
+    priceMonthly: 29, priceYearly: 279, scanLimit: Infinity,
+    features: [
+      { text: 'Everything in Pro', on: true },
+      { text: 'Bulk photo scanning', on: true },
+      { text: 'Supplier price comparison', on: true },
+      { text: 'CSV export', on: true },
+      { text: 'API access', on: true },
+    ],
+  },
+};
+
+const SubscriptionService = {
+  state: { plan: 'free', scansUsed: 0, periodStart: null, billing: 'monthly' },
+
+  /* REAL INTEGRATION: replace with `this.state = await (await fetch('/api/me')).json()`
+     so plan and usage live server-side and cannot be edited in devtools. */
+  load() {
+    const raw = store.get(CONFIG.subStorage);
+    if (raw) {
+      try { this.state = { ...this.state, ...JSON.parse(raw) }; } catch {}
+    }
+    if (!PLANS[this.state.plan]) this.state.plan = 'free';
+    if (typeof this.state.scansUsed !== 'number' || this.state.scansUsed < 0) this.state.scansUsed = 0;
+    if (!this.state.periodStart) this.state.periodStart = Date.now();
+    this.rolloverIfNeeded();
+    return this.state;
+  },
+
+  save() { store.set(CONFIG.subStorage, JSON.stringify(this.state)); },
+
+  /** Resets the monthly allowance after 30 days. */
+  rolloverIfNeeded() {
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    if (Date.now() - this.state.periodStart > THIRTY_DAYS) {
+      this.state.periodStart = Date.now();
+      this.state.scansUsed = 0;
+      this.save();
+    }
+  },
+
+  plan() { return PLANS[this.state.plan] || PLANS.free; },
+  limit() { return this.plan().scanLimit; },
+  remaining() {
+    const lim = this.limit();
+    return lim === Infinity ? Infinity : Math.max(0, lim - this.state.scansUsed);
+  },
+  canScan() { return this.remaining() > 0; },
+
+  /** Only called after a scan actually succeeds — failures never cost a credit. */
+  recordScan() {
+    if (this.limit() !== Infinity) {
+      this.state.scansUsed += 1;
+      this.save();
+    }
+    renderUsagePill();
+  },
+
+  setPlan(planId, billing) {
+    this.state.plan = planId;
+    this.state.billing = billing || this.state.billing;
+    this.state.scansUsed = 0;
+    this.state.periodStart = Date.now();
+    this.save();
+    renderUsagePill();
+  },
+
+  cancel() {
+    this.state.plan = 'free';
+    this.state.scansUsed = 0;
+    this.state.periodStart = Date.now();
+    this.save();
+    renderUsagePill();
+  },
+};
+
+const PaymentService = {
+  /**
+   * REAL INTEGRATION — this is the one function to replace for real payments:
+   *   const res = await fetch('/api/create-checkout-session', {
+   *     method: 'POST', headers: { 'Content-Type': 'application/json' },
+   *     body: JSON.stringify({ planId, billing }),
+   *   });
+   *   const { url } = await res.json();
+   *   window.location = url;
+   * Activate the plan from the `checkout.session.completed` webhook on your
+   * server — never from the browser, where it can be spoofed.
+   */
+  async checkout(planId, billing) {
+    await sleep(1400);
+    return { success: true, planId, billing, simulated: true };
+  },
+};
+
+/* =========================================================================
+   7. ICONS
+   ========================================================================= */
+const PLATFORM_ICONS = {
+  tiktok: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-1.02-.9-1.6-2.15-1.6-3.5h-3.05v13.55c0 1.65-1.35 2.98-3 2.98a3 3 0 010-6c.34 0 .66.05.96.15V9.87a6.5 6.5 0 00-.96-.07 6.02 6.02 0 106.02 6.02V9.42a8.15 8.15 0 004.63 1.44V7.8a4.85 4.85 0 01-3-1.98z"/></svg>`,
+  youtube: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2s-.2-1.5-.85-2.15c-.8-.85-1.7-.85-2.1-.9C15.8 4 12 4 12 4h0s-3.8 0-6.65.15c-.4.05-1.3.05-2.1.9C2.6 5.7 2.4 7.2 2.4 7.2S2.2 9 2.2 10.75v1.5c0 1.75.2 3.55.2 3.55s.2 1.5.85 2.15c.8.85 1.85.83 2.3.9C7.1 19 12 19 12 19s3.8 0 6.65-.15c.4-.05 1.3-.05 2.1-.9.65-.65.85-2.15.85-2.15s.2-1.8.2-3.55v-1.5c0-1.75-.2-3.55-.2-3.55zM9.9 14.6V8.9l5.4 2.85-5.4 2.85z"/></svg>`,
+  instagram: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1"/></svg>`,
+  facebook: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-7.6h2.55l.38-2.96h-2.93V8.53c0-.86.24-1.44 1.47-1.44h1.57V4.46A21 21 0 0014.8 4.3c-2.24 0-3.78 1.37-3.78 3.87v2.17H8.46v2.96h2.56V21h2.48z"/></svg>`,
+};
+
+const HERO_ICON = `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 58V30a8 8 0 018-8h0a8 8 0 018 8v28"/><rect x="20" y="14" width="20" height="10" rx="2"/><path d="M40 17h6l4-3M46 14l4 2M46 20l5-1"/><path d="M22 40h16M22 48h16"/></svg>`;
+
+const ICON_SCAN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V4a1 1 0 011-1h3M20 7V4a1 1 0 00-1-1h-3M3 17v3a1 1 0 001 1h3M20 17v3a1 1 0 01-1 1h-3"/><circle cx="12" cy="12" r="3"/></svg>`;
+const ICON_ARROW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
+const ICON_EXTERNAL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>`;
+const ICON_BACK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>`;
+const ICON_ALERT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>`;
+const ICON_TARGET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.5" fill="currentColor"/></svg>`;
+const ICON_INFO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M12 11v5"/></svg>`;
+const ICON_EYE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const ICON_BAG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l1 13H5L6 8z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg>`;
+const ICON_UPLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>`;
+const ICON_CLOSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+const ICON_KEY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.5 12.5L20 3M17 6l2 2M14 9l2 2"/></svg>`;
+const ICON_CAMERA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 012-2h2.5l1.2-2h6.6l1.2 2H20a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/><circle cx="12" cy="12.5" r="3.5"/></svg>`;
+const ICON_FLIP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 0113.5-3.5L20 8"/><path d="M20 4v4h-4"/><path d="M20 15a8 8 0 01-13.5 3.5L4 16"/><path d="M4 20v-4h4"/></svg>`;
+const ICON_SEARCH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>`;
+const ICON_IMAGE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-9 9"/></svg>`;
+
+/* =========================================================================
+   8. STATE + VIEW SWAP
+   Every screen change goes through setView(), which is also the single place
+   the camera stream gets torn down — a stream left running keeps the phone's
+   camera light on and drains the battery.
+   ========================================================================= */
+const app = document.getElementById('mainContent');
+
+const State = {
+  view: 'home',
+  photo: null,        // { dataUrl, name, width, height, bytes }
+  product: null,
+  cameraStream: null,
+};
+
+function stopCameraStream() {
+  if (State.cameraStream) {
+    State.cameraStream.getTracks().forEach(track => track.stop());
+    State.cameraStream = null;
+  }
+}
+
+function setView(name, html) {
+  stopCameraStream();
+  State.view = name;
+  app.innerHTML = html;
+}
+
+/* =========================================================================
+   9. VIEWS
+   ========================================================================= */
+function renderHome() {
+  const pasteHint = IS_MOBILE
+    ? 'Camera photos, screenshots, saved images — anything on your device'
+    : 'You can also paste one with ' + (/Mac|iPhone|iPad/i.test(navigator.platform) ? 'Cmd+V' : 'Ctrl+V');
+
+  setView('home', `
+    <section class="hero" id="top">
+      <div class="wrap hero-inner">
+        <div>
+          <span class="eyebrow"><span class="dot"></span> AI-POWERED PRODUCT DETECTION</span>
+          <h1 class="headline">Snap it. Scan it. <span class="accent">Buy it.</span></h1>
+          <p class="sub">Spotted something you want? Take a photo with your phone, or upload a screenshot from a video, and our AI identifies the product and finds where to get it.</p>
+
+          <div class="scan-panel">
+            <div class="panel-head">
+              <span class="mode-tag real">${ICON_CHECK} Real AI identification</span>
+              <span class="mode-tag real" style="background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.3);color:var(--violet);">${ICON_IMAGE} Photos only — no links</span>
+            </div>
+
+            <!-- Kept OUTSIDE .dropzone on purpose: input.click() bubbles, and a
+                 hidden input inside its own click handler re-triggers itself. -->
+            <input type="file" id="photoInput" accept="image/*" />
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" />
+
+            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Choose a photo from this device">
+              <div class="dz-icon">${ICON_UPLOAD}</div>
+              <p>${IS_MOBILE ? 'Tap to pick a photo from your device' : 'Drop a photo here, or click to browse'}</p>
+              <span class="hint">${pasteHint}</span>
+            </div>
+
+            <div class="upload-actions">
+              <button class="camera-btn" id="cameraBtn" type="button">${ICON_CAMERA} Take a photo</button>
+              <button class="camera-btn" id="galleryBtn" type="button">${ICON_IMAGE} Choose from device</button>
+            </div>
+
+            <div class="camera-stage" id="cameraStage">
+              <video id="cameraVideo" playsinline autoplay muted></video>
+              <div class="camera-frame"><span></span><span></span><span></span><span></span></div>
+              <div class="camera-controls">
+                <button type="button" class="cam-cancel" id="cameraCancel">Cancel</button>
+                <button type="button" class="cam-shutter" id="cameraShutter" aria-label="Take photo"><span></span></button>
+                <button type="button" class="cam-flip" id="cameraFlip" aria-label="Switch camera">${ICON_FLIP}</button>
+              </div>
+            </div>
+
+            <div class="dz-preview" id="dzPreview">
+              <img id="dzPreviewImg" alt="Selected photo preview" />
+              <div class="dz-info">
+                <p id="dzFileName"></p>
+                <span id="dzFileSize"></span>
+              </div>
+              <button class="dz-remove" id="dzRemove" type="button" aria-label="Remove photo">${ICON_CLOSE}</button>
+            </div>
+
+            <button class="identify-btn" id="identifyBtn" type="button" disabled>${ICON_SCAN} Identify Product</button>
+            <div class="form-error" id="uploadError">${ICON_ALERT} <span id="uploadErrorText"></span></div>
+
+            <button class="key-toggle" id="keyToggle" type="button">${ICON_KEY} <span id="keyToggleLabel">Add your API key</span></button>
+            <div class="key-panel" id="keyPanel">
+              <label for="apiKeyInput">API key — Google Gemini or OpenAI</label>
+              <div class="key-row">
+                <input type="password" id="apiKeyInput" autocomplete="off" spellcheck="false" placeholder="AIza… or sk-…" />
+                <button class="key-save" id="keySave" type="button">Save</button>
+              </div>
+              <p class="key-note"><b style="color:var(--lime)">Free option:</b> get a Google Gemini key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — no credit card, around 1,500 scans a day. Paste it and the app uses Gemini automatically. An <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI key</a> (starts with <code>sk-</code>) also works but needs paid credit. Either one is stored only in this browser and sent straight from here to that provider — never to us. Leave the field empty and press Save to forget it.</p>
+              <div class="key-status" id="keyStatus" style="display:none;">${ICON_CHECK} <span id="keyStatusText">Key saved for this browser</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="viewfinder">
+            <div class="vf-noise"></div>
+            <div class="vf-topbar">
+              <span class="rec"><span></span>SCANNING</span>
+              <span>PHOTO</span>
+            </div>
+            <div class="product-silhouette">${HERO_ICON}</div>
+            <div class="scan-bracket"><span></span><span></span><span></span><span></span></div>
+            <div class="scan-line"></div>
+            <div class="id-tag">${ICON_TARGET} <b>Plant Mister</b> · 94%</div>
+            <div class="vf-platform-chip">
+              <span>your_photo.jpg</span>
+              <span>1280 × 960</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-eyebrow">The process</span>
+          <h2 class="section-title">From photo to cart in three steps</h2>
+          <p class="section-desc">No scrolling through comments hoping someone dropped a link. Snap, scan, buy.</p>
+        </div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num">01</div>
+            <div class="step-icon">${ICON_CAMERA}</div>
+            <h3>Snap or upload</h3>
+            <p>Take a photo of the thing in front of you, or screenshot the moment it appears in a video and drop that image in.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num">02</div>
+            <div class="step-icon">${ICON_SCAN}</div>
+            <h3>Scan</h3>
+            <p>Vision AI reads the image and identifies the exact product being shown, with a confidence score.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num">03</div>
+            <div class="step-icon">${ICON_BAG}</div>
+            <h3>Buy</h3>
+            <p>Get a clear explanation of the product plus live search links to real stores that sell it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-eyebrow">Where your photo comes from</span>
+          <h2 class="section-title">Screenshot it from anywhere</h2>
+          <p class="section-desc">Pause the video, screenshot the frame, and upload it. Works with any app on your phone — the scan happens on the image, not the link.</p>
+        </div>
+        <div class="platform-grid">
+          <div class="platform-card"><div class="picon" style="color:#25F4EE">${PLATFORM_ICONS.tiktok}</div><span>TikTok</span></div>
+          <div class="platform-card"><div class="picon" style="color:#FF4D4D">${PLATFORM_ICONS.youtube}</div><span>YouTube Shorts</span></div>
+          <div class="platform-card"><div class="picon" style="color:#E1306C">${PLATFORM_ICONS.instagram}</div><span>Instagram Reels</span></div>
+          <div class="platform-card"><div class="picon" style="color:#5B8DEF">${PLATFORM_ICONS.facebook}</div><span>Facebook</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="discover">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-eyebrow">Example</span>
+          <h2 class="section-title">See a discovery in action</h2>
+          <p class="section-desc">Here's what happens when someone screenshots a viral plant-care video and scans it.</p>
+        </div>
+        <div class="example-panel">
+          <div class="example-flow">
+            <div class="ex-node">
+              <div class="ex-icon">${ICON_IMAGE}</div>
+              <h4>Your photo</h4>
+              <p>A screenshot from a plant-care clip, straight off the phone</p>
+            </div>
+            <span class="ex-arrow">${ICON_ARROW}</span>
+            <div class="ex-node">
+              <div class="ex-icon">${ICON_SCAN}</div>
+              <h4>AI identifies product</h4>
+              <p>Ceramic plant mister, 94% match confidence</p>
+            </div>
+            <span class="ex-arrow">${ICON_ARROW}</span>
+            <div class="ex-node">
+              <div class="ex-icon" style="color:var(--lime)">${ICON_BAG}</div>
+              <h4>Buy options</h4>
+              <div class="ex-result">
+                <div style="font-size:12.5px;color:var(--text-dim);">Live search · Etsy, Amazon, Walmart</div>
+                <div class="ex-price">4 real store links</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-eyebrow">Pricing</span>
+          <h2 class="section-title">Start free, upgrade when you're hooked</h2>
+          <p class="section-desc">Every plan includes real AI identification. Cancel anytime.</p>
+        </div>
+        <div style="text-align:center;">
+          <div class="billing-toggle" id="billingToggle">
+            <button type="button" class="active" data-billing="monthly">Monthly</button>
+            <button type="button" data-billing="yearly">Yearly<span class="save-badge">SAVE 27%</span></button>
+          </div>
+        </div>
+        <div class="pricing-grid" id="pricingGrid"></div>
+      </div>
+    </section>
+  `);
+
+  renderPricing('monthly');
+  bindHomeEvents();
+  renderUsagePill();
+}
+
+/** Renders the three plan cards for the selected billing cycle. */
+function renderPricing(billing) {
+  const grid = document.getElementById('pricingGrid');
+  if (!grid) return;
+  const currentPlan = SubscriptionService.state.plan;
+
+  grid.innerHTML = Object.values(PLANS).map(p => {
+    const price = billing === 'yearly' ? p.priceYearly : p.priceMonthly;
+    const per = billing === 'yearly' ? '/year' : '/month';
+    const isCurrent = p.id === currentPlan;
+    const sub = p.id === 'free'
+      ? 'No card required'
+      : (billing === 'yearly' ? `That's $${(p.priceYearly / 12).toFixed(2)}/mo` : 'Billed monthly');
+
+    let btn;
+    if (isCurrent) btn = `<button class="price-btn current" type="button" disabled>${ICON_CHECK} Current plan</button>`;
+    else if (p.id === 'free') btn = `<button class="price-btn" type="button" data-downgrade="free">Switch to Free</button>`;
+    else btn = `<button class="price-btn ${p.featured ? 'primary' : ''}" type="button" data-plan="${p.id}">Upgrade to ${p.name}</button>`;
+
+    return `
+      <div class="price-card ${p.featured ? 'featured' : ''}">
+        ${p.featured ? '<span class="price-badge">MOST POPULAR</span>' : ''}
+        <h3>${p.name}</h3>
+        <p class="tagline">${p.tagline}</p>
+        <div class="price-amount"><span class="amt">$${price}</span><span class="per">${p.id === 'free' ? '' : per}</span></div>
+        <div class="price-sub">${sub}</div>
+        <ul class="price-features">
+          ${p.features.map(f => `<li class="${f.on ? '' : 'off'}">${f.on ? ICON_CHECK : ICON_CLOSE} ${f.text}</li>`).join('')}
+        </ul>
+        ${btn}
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('[data-plan]').forEach(b =>
+    b.addEventListener('click', () => openUpgradeModal(b.dataset.plan, billing)));
+  grid.querySelectorAll('[data-downgrade]').forEach(b =>
+    b.addEventListener('click', () => {
+      SubscriptionService.cancel();
+      renderPricing(billing);
+    }));
+}
+
+/** Currently selected billing cycle on the pricing toggle. */
+function currentBilling() {
+  return document.querySelector('#billingToggle .active')?.dataset.billing || 'monthly';
+}
+
+/* ----- Upgrade modal ----- */
+let modalSelection = { plan: 'pro', billing: 'monthly' };
+
+function openUpgradeModal(planId, billing, outOfScans) {
+  modalSelection = { plan: planId || 'pro', billing: billing || 'monthly' };
+  const overlay = document.getElementById('upgradeModal');
+  const body = document.getElementById('modalBody');
+
+  const title = outOfScans ? "You've used your free scans" : 'Upgrade your plan';
+  const desc = outOfScans
+    ? `You've used all ${PLANS.free.scanLimit} scans on the Free plan this month. Upgrade for unlimited product identification.`
+    : 'Pick a plan and get unlimited scans right away.';
+
+  body.innerHTML = `
+    <button class="modal-close" id="modalClose" type="button" aria-label="Close">${ICON_CLOSE}</button>
+    <div class="modal-icon">${outOfScans ? ICON_ALERT : ICON_BAG}</div>
+    <h3 id="modalTitle">${title}</h3>
+    <p>${desc}</p>
+    ${['pro', 'business'].map(id => {
+      const p = PLANS[id];
+      const price = modalSelection.billing === 'yearly' ? p.priceYearly : p.priceMonthly;
+      const per = modalSelection.billing === 'yearly' ? '/yr' : '/mo';
+      return `
+      <div class="modal-plan ${modalSelection.plan === id ? 'selected' : ''}" data-select="${id}">
+        <span class="radio"></span>
+        <span class="mp-info"><strong>${p.name}</strong><span>${p.tagline}</span></span>
+        <span class="mp-price">$${price}${per}</span>
+      </div>`;
+    }).join('')}
+    <button class="modal-cta" id="modalCheckout" type="button">${ICON_CHECK} Continue to checkout</button>
+    <div class="demo-notice">${ICON_ALERT} <span><strong>Demo checkout.</strong> No card is collected and no money changes hands — this simulates the Stripe redirect so you can test the full flow. Connect a real Stripe account in <code>PaymentService.checkout()</code> to take payments.</span></div>
+    ${SubscriptionService.state.plan !== 'free' ? '<button class="modal-manage" id="modalCancel" type="button">Cancel my subscription</button>' : ''}
+  `;
+
+  overlay.classList.add('open');
+
+  body.querySelectorAll('[data-select]').forEach(el => el.addEventListener('click', () => {
+    modalSelection.plan = el.dataset.select;
+    body.querySelectorAll('.modal-plan').forEach(p => p.classList.toggle('selected', p === el));
+  }));
+
+  document.getElementById('modalClose').addEventListener('click', closeUpgradeModal);
+  document.getElementById('modalCancel')?.addEventListener('click', () => {
+    SubscriptionService.cancel();
+    closeUpgradeModal();
+    renderPricing(currentBilling());
+  });
+
+  const checkoutBtn = document.getElementById('modalCheckout');
+  checkoutBtn.addEventListener('click', async () => {
+    checkoutBtn.disabled = true;
+    checkoutBtn.innerHTML = `${ICON_SCAN} Processing…`;
+    try {
+      const result = await PaymentService.checkout(modalSelection.plan, modalSelection.billing);
+      if (!result.success) throw new Error('declined');
+      SubscriptionService.setPlan(modalSelection.plan, modalSelection.billing);
+      showUpgradeSuccess(modalSelection.plan);
+    } catch {
+      checkoutBtn.disabled = false;
+      checkoutBtn.innerHTML = `${ICON_ALERT} Checkout failed — try again`;
+    }
+  });
+}
+
+function showUpgradeSuccess(planId) {
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <button class="modal-close" id="modalClose" type="button" aria-label="Close">${ICON_CLOSE}</button>
+    <div class="modal-icon" style="background:rgba(195,255,61,0.12);">${ICON_CHECK}</div>
+    <h3 id="modalTitle">You're on ${PLANS[planId].name}</h3>
+    <p>Unlimited scans are unlocked. Go find something good.</p>
+    <button class="modal-cta" id="modalDone" type="button">${ICON_SCAN} Start scanning</button>
+  `;
+  document.getElementById('modalClose').addEventListener('click', closeUpgradeModal);
+  document.getElementById('modalDone').addEventListener('click', () => {
+    closeUpgradeModal();
+    renderPricing(currentBilling());
+    document.getElementById('top')?.scrollIntoView({ behavior: 'smooth' });
+  });
+}
+
+function closeUpgradeModal() {
+  document.getElementById('upgradeModal').classList.remove('open');
+}
+
+/** Nav pill showing plan + scans remaining. */
+function renderUsagePill() {
+  const pill = document.getElementById('usagePill');
+  if (!pill) return;
+  const plan = SubscriptionService.plan();
+  const remaining = SubscriptionService.remaining();
+  const isPaid = plan.id !== 'free';
+  pill.className = `usage-pill${isPaid ? ' pro' : ''}`;
+  pill.innerHTML = isPaid
+    ? `<span class="plan-dot"></span><b>${plan.name}</b> · Unlimited`
+    : `<span class="plan-dot"></span><b>${remaining}</b> of ${plan.scanLimit} scans left`;
+}
+
+/* =========================================================================
+   10. HOME BINDINGS
+   All wiring for the home screen. Re-run on every renderHome(); everything
+   here is scoped to elements that were just created, so nothing leaks
+   between renders. The one document-level listener (paste) is registered
+   once in section 11 and reads through to the handler stored here.
+   ========================================================================= */
+let handlePastedFile = null;   // set below, read by the global paste listener
+
+function bindHomeEvents() {
+  const $ = (id) => document.getElementById(id);
+
+  const dropzone     = $('dropzone');
+  const photoInput   = $('photoInput');
+  const cameraInput  = $('cameraInput');
+  const cameraBtn    = $('cameraBtn');
+  const galleryBtn   = $('galleryBtn');
+  const dzPreview    = $('dzPreview');
+  const dzPreviewImg = $('dzPreviewImg');
+  const dzFileName   = $('dzFileName');
+  const dzFileSize   = $('dzFileSize');
+  const dzRemove     = $('dzRemove');
+  const uploadError  = $('uploadError');
+  const uploadErrorText = $('uploadErrorText');
+  const identifyBtn  = $('identifyBtn');
+  const uploadActions = document.querySelector('.upload-actions');
+
+  const keyToggle      = $('keyToggle');
+  const keyToggleLabel = $('keyToggleLabel');
+  const keyPanel       = $('keyPanel');
+  const apiKeyInput    = $('apiKeyInput');
+  const keySave        = $('keySave');
+  const keyStatus      = $('keyStatus');
+
+  const cameraStage   = $('cameraStage');
+  const cameraVideo   = $('cameraVideo');
+  const cameraShutter = $('cameraShutter');
+  const cameraCancel  = $('cameraCancel');
+  const cameraFlip    = $('cameraFlip');
+
+  const usingBackend = !!CONFIG.backendEndpoint;
+  let facingMode = 'environment';
+
+  /* ----- error helpers ----- */
+  function showError(msg) {
+    uploadErrorText.textContent = msg;
+    uploadError.classList.add('show');
+    uploadError.classList.remove('shake');
+    void uploadError.offsetWidth;          // restart the animation
+    uploadError.classList.add('shake');
+  }
+  function clearError() {
+    uploadError.classList.remove('show', 'shake');
+  }
+
+  /* ----- picker state ----- */
+  function showPicker() {
+    dropzone.style.display = 'block';
+    if (uploadActions) uploadActions.style.display = '';
+  }
+  function hidePicker() {
+    dropzone.style.display = 'none';
+    if (uploadActions) uploadActions.style.display = 'none';
+  }
+
+  function updateIdentifyState() {
+    // The photo is the real requirement. A missing key is handled on click
+    // by opening the key panel, which explains itself far better than a
+    // permanently greyed-out button does.
+    identifyBtn.disabled = !State.photo;
+  }
+
+  /** Show a normalized photo in the preview slot. */
+  function applyPhoto(photo) {
+    State.photo = photo;
+    dzPreviewImg.src = photo.dataUrl;
+    dzFileName.textContent = photo.name;
+    dzFileSize.textContent = `${photo.width}×${photo.height} · ${formatBytes(photo.bytes)}`;
+    dzPreview.classList.add('active');
+    hidePicker();
+    updateIdentifyState();
+  }
+
+  function clearPhoto() {
+    State.photo = null;
+    photoInput.value = '';
+    cameraInput.value = '';
+    dzPreviewImg.removeAttribute('src');
+    dzPreview.classList.remove('active');
+    showPicker();
+    updateIdentifyState();
+  }
+
+  /** Every file entry point lands here. */
+  async function acceptFile(file) {
+    clearError();
+    dropzone.classList.add('drag');
+    try {
+      applyPhoto(await ImageIntake.fromFile(file));
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      dropzone.classList.remove('drag');
+    }
+  }
+
+  handlePastedFile = acceptFile;   // exposed to the global paste listener
+
+  /* ----- file pickers ----- */
+  dropzone.addEventListener('click', () => photoInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); photoInput.click(); }
+  });
+  galleryBtn.addEventListener('click', () => photoInput.click());
+
+  photoInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) acceptFile(file);
+  });
+  cameraInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) acceptFile(file);
+  });
+
+  /* ----- drag and drop ----- */
+  ['dragenter', 'dragover'].forEach(evt => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault(); dropzone.classList.add('drag');
+  }));
+  ['dragleave', 'dragend'].forEach(evt => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault(); dropzone.classList.remove('drag');
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) acceptFile(file);
+  });
+
+  dzRemove.addEventListener('click', clearPhoto);
+
+  /* ----- camera -----
+     On phones the native camera app (a file input with `capture`) is far more
+     reliable than getUserMedia: no permission prompt to fumble, correct
+     orientation, and it works even when the page is not on https. On desktop
+     we open the in-page live viewfinder instead, falling back to the same
+     file input if the browser refuses. */
+  function stopCameraUI() {
+    stopCameraStream();
+    cameraStage.classList.remove('active');
+    if (!State.photo) showPicker();
+  }
+
+  async function openLiveCamera() {
+    clearError();
+    try {
+      State.cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1920 } },
+        audio: false,
+      });
+      cameraVideo.srcObject = State.cameraStream;
+      cameraStage.classList.add('active');
+      hidePicker();
+      return true;
+    } catch (err) {
+      if (err && err.name === 'NotAllowedError') {
+        showError('Camera permission was denied. Allow camera access in your browser settings, or choose a photo from your device instead.');
+      } else if (err && err.name === 'NotFoundError') {
+        showError('No camera found on this device. Choose a photo from your device instead.');
+      } else {
+        showError('Could not start the camera. Choose a photo from your device instead.');
+      }
+      stopCameraUI();
+      return false;
+    }
+  }
+
+  cameraBtn.addEventListener('click', async () => {
+    clearError();
+    if (IS_MOBILE || !canUseLiveCamera()) {
+      if (!IS_MOBILE && !window.isSecureContext) {
+        // Desktop over file:// or plain http — getUserMedia is blocked outright.
+        showError('The live camera needs the page served over https (or localhost). Opening your file picker instead.');
+      }
+      cameraInput.click();
+      return;
+    }
+    await openLiveCamera();
+  });
+
+  cameraShutter.addEventListener('click', () => {
+    if (!State.cameraStream) return;
+    try {
+      const photo = ImageIntake.fromVideoFrame(cameraVideo);
+      const flash = document.createElement('div');
+      flash.className = 'camera-flash fire';
+      cameraStage.appendChild(flash);
+      setTimeout(() => flash.remove(), 500);
+      stopCameraStream();
+      cameraStage.classList.remove('active');
+      applyPhoto(photo);
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
+  cameraCancel.addEventListener('click', stopCameraUI);
+
+  cameraFlip.addEventListener('click', async () => {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    stopCameraStream();
+    await openLiveCamera();
+  });
+
+  /* ----- API key panel ----- */
+  if (usingBackend) {
+    // A backend holds the key; the visitor never needs one.
+    keyToggle.style.display = 'none';
+    keyPanel.style.display = 'none';
+  } else {
+    const keyStatusText = $('keyStatusText');
+    const PROVIDER_NAMES = { gemini: 'Google Gemini', openai: 'OpenAI' };
+
+    function reflectKey(key) {
+      const provider = detectKeyProvider(key);
+      keyToggle.classList.toggle('needed', !provider);
+      if (!provider) {
+        keyToggleLabel.textContent = 'Step 1 — add your free API key';
+        keyStatus.style.display = 'none';
+        return;
+      }
+      keyToggleLabel.textContent = `${PROVIDER_NAMES[provider]} key saved`;
+      const chosenModel = provider === 'gemini' ? store.get(CONFIG.geminiModelStorage) : '';
+      keyStatusText.textContent = `Saved — scans will run on ${PROVIDER_NAMES[provider]}`
+        + (provider === 'gemini' ? ` (free tier${chosenModel ? ', ' + chosenModel : ''})` : '');
+      keyStatus.style.display = 'flex';
+    }
+
+    const savedKey = store.get(CONFIG.keyStorage) || '';
+    if (savedKey) {
+      apiKeyInput.value = savedKey;
+      reflectKey(savedKey);
+    } else {
+      // Nothing works without a key, so lead with it instead of hiding it
+      // behind a small grey link people scroll past.
+      keyPanel.classList.add('open');
+      keyToggle.classList.add('needed');
+      keyToggleLabel.textContent = 'Step 1 — add your free API key';
+    }
+
+    keyToggle.addEventListener('click', () => keyPanel.classList.toggle('open'));
+
+    keySave.addEventListener('click', () => {
+      const val = apiKeyInput.value.trim();
+      if (!val) {
+        store.remove(CONFIG.keyStorage);
+        store.remove(CONFIG.geminiModelStorage);
+        reflectKey('');
+        clearError();
+        return;
+      }
+      const problem = keyPasteProblem(val);
+      if (problem) { showError(problem); return; }
+      // A different key may belong to a different account or provider, so the
+      // remembered Gemini model no longer necessarily applies.
+      store.remove(CONFIG.geminiModelStorage);
+      if (!store.set(CONFIG.keyStorage, val)) {
+        showError('This browser is blocking storage, so the key will only last for this page visit.');
+      } else {
+        clearError();
+      }
+      reflectKey(val);
+    });
+
+    apiKeyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') keySave.click(); });
+  }
+
+  /* ----- identify ----- */
+  identifyBtn.addEventListener('click', () => {
+    if (!State.photo) { showError('Add a photo first.'); return; }
+
+    let key = '';
+    if (!usingBackend) {
+      key = apiKeyInput.value.trim();
+      if (!key) {
+        keyPanel.classList.add('open');
+        showError('Add an API key below to run a real identification. A free Google Gemini key works.');
+        apiKeyInput.focus();
+        return;
+      }
+      const problem = keyPasteProblem(key);
+      if (problem) {
+        keyPanel.classList.add('open');
+        showError(problem);
+        apiKeyInput.focus();
+        return;
+      }
+      store.set(CONFIG.keyStorage, key);
+    }
+
+    if (!SubscriptionService.canScan()) {
+      openUpgradeModal('pro', currentBilling(), true);
+      return;
+    }
+
+    clearError();
+    startScan(State.photo, key);
+  });
+
+  /* ----- nav CTAs ----- */
+  function focusScanner() {
+    document.getElementById('top')?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => dropzone.focus({ preventScroll: true }), 450);
+  }
+  $('navScanBtn')?.addEventListener('click', focusScanner);
+  $('navScanBtnMobile')?.addEventListener('click', () => { closeMobileMenu(); focusScanner(); });
+
+  /* ----- billing toggle ----- */
+  const billingToggle = $('billingToggle');
+  billingToggle?.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      billingToggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderPricing(btn.dataset.billing);
+    });
+  });
+
+  /* Restore a photo the user already picked (e.g. after a failed scan). */
+  if (State.photo) applyPhoto(State.photo);
+  updateIdentifyState();
+}
+
+/* =========================================================================
+   11. SCAN FLOW + REMAINING VIEWS
+   ========================================================================= */
+function renderScanning() {
+  setView('scanning', `
+    <section class="scan-view">
+      <div class="wrap scan-stage fade-in">
+        <div class="scan-orb">
+          <div class="ring"></div>
+          <div class="ring2"></div>
+          <div class="core">${ICON_SCAN}</div>
+        </div>
+        <div class="scan-status" id="scanStatus">${IdentifyService.steps[0].label}</div>
+        <div class="scan-substatus" id="scanSub">${IdentifyService.steps[0].sub}</div>
+        <div class="scan-progress-track"><div class="scan-progress-fill" id="scanFill"></div></div>
+        <ul class="scan-checklist" id="scanChecklist">
+          ${IdentifyService.steps.map(s => `<li><span class="chk"></span>${s.label.replace('…', '')}</li>`).join('')}
+        </ul>
+      </div>
+    </section>
+  `);
+}
+
+/** Returns an onStep(index, total, step) callback bound to the scanning view. */
+function wireScanUI() {
+  const stepEls = document.querySelectorAll('#scanChecklist li');
+  const statusEl = document.getElementById('scanStatus');
+  const subEl = document.getElementById('scanSub');
+  const fillEl = document.getElementById('scanFill');
+
+  return (index, total, step) => {
+    if (!statusEl) return;   // view already swapped out
+    statusEl.textContent = step.label;
+    subEl.textContent = step.sub;
+    fillEl.style.width = `${((index + 1) / (total || stepEls.length)) * 100}%`;
+    stepEls.forEach((li, i) => {
+      li.classList.toggle('done', i < index);
+      li.classList.toggle('active', i === index);
+      if (i < index) li.querySelector('.chk').innerHTML = ICON_CHECK;
+    });
+  };
+}
+
+function markAllStepsDone() {
+  document.querySelectorAll('#scanChecklist li').forEach(li => {
+    li.classList.add('done');
+    li.classList.remove('active');
+    li.querySelector('.chk').innerHTML = ICON_CHECK;
+  });
+}
+
+async function startScan(photo, apiKey) {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderScanning();
+  const onStep = wireScanUI();
+
+  let product;
+  try {
+    product = await IdentifyService.identify(photo, apiKey, onStep);
+  } catch (err) {
+    renderError(err.message || 'Something went wrong while identifying that photo. Please try again.');
+    return;
+  }
+
+  markAllStepsDone();
+  SubscriptionService.recordScan();   // only a successful scan costs a credit
+  State.product = product;
+  await sleep(400);
+  renderResult(product);
+}
+
+function renderResult(product) {
+  const name = escapeHtml(product.name);
+  const links = buildSearchLinks(product.searchQuery);
+  const remaining = SubscriptionService.remaining();
+
+  setView('result', `
+    <section class="result-view">
+      <div class="wrap fade-in">
+        <a href="#" id="backHome" class="result-back">${ICON_BACK} Scan another photo</a>
+
+        <div class="result-grid">
+          <div class="result-visual">
+            <img src="${product.image}" alt="${name}" style="position:relative;z-index:1;max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;" />
+            <div class="result-platform-badge">${ICON_CHECK} Identified from your photo</div>
+          </div>
+
+          <div class="result-info">
+            <div>
+              <span class="conf-badge">${ICON_CHECK} ${product.confidence}% match confidence</span>
+              <span class="cat-tag">${escapeHtml(product.category)}</span>
+            </div>
+            <h1 class="result-title">${name}</h1>
+            <p class="result-desc">${escapeHtml(product.description)}</p>
+
+            ${product.whatItDoes ? `
+            <div class="info-card">
+              <h4>${ICON_INFO} What it does</h4>
+              <p>${escapeHtml(product.whatItDoes)}</p>
+            </div>` : ''}
+
+            ${product.notSureAbout ? `
+            <div class="info-card unsure">
+              <h4>${ICON_INFO} What we couldn't tell from the photo</h4>
+              <p>${escapeHtml(product.notSureAbout)}</p>
+            </div>` : ''}
+
+            ${product.priceRange ? `
+            <div class="price-estimate">
+              <span class="pe-label">${ICON_BAG} Usually sells for</span>
+              <span class="pe-value">${escapeHtml(product.priceRange)}</span>
+              <span class="pe-caveat">${ICON_INFO} AI estimate from what this item normally costs — not a live price. Check the real price in the store links below.</span>
+            </div>` : ''}
+
+            ${product.buyingTips.length ? `
+            <div class="info-card">
+              <h4>${ICON_CHECK} Before you buy</h4>
+              <ul class="clue-list">
+                ${product.buyingTips.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+              </ul>
+            </div>` : ''}
+
+            ${product.clues.length ? `
+            <div class="info-card">
+              <h4>${ICON_EYE} Why we think this is it</h4>
+              <ul class="clue-list">
+                ${product.clues.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+              </ul>
+            </div>` : ''}
+          </div>
+        </div>
+
+        <div class="buy-section-head">
+          <h3>Buy / find it</h3>
+          <span>Live search links</span>
+        </div>
+
+        <form class="search-refine" id="searchRefine" novalidate>
+          <label for="searchQueryInput">${ICON_SEARCH} Searching the stores for</label>
+          <input id="searchQueryInput" type="text" autocomplete="off" spellcheck="false" value="${escapeHtml(product.searchQuery)}" />
+          <p>Not specific enough? Add the model number, size, wattage or colour — every store link below updates as you type.</p>
+        </form>
+
+        <div class="supplier-grid">
+          ${links.map(l => `
+            <div class="supplier-card" data-store="${l.key}">
+              <div class="supplier-thumb store-tile" style="--store:${l.color};">
+                <span class="store-mark">${l.mark}</span>
+                <span class="store-name">${l.store}</span>
+              </div>
+              <h5>${l.note}</h5>
+              <span class="supplier-ship">${ICON_SEARCH} Opens a live ${l.store} search for "<span class="sq-text">${escapeHtml(product.searchQuery)}</span>"</span>
+              <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" class="view-product-btn" data-store-link style="--store:${l.color};">Search ${l.store} ${ICON_EXTERNAL}</a>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="rescan-cta">
+          <p>${remaining === Infinity
+              ? 'Spotted something else worth finding?'
+              : `You have <b style="color:var(--lime)">${remaining}</b> free ${remaining === 1 ? 'scan' : 'scans'} left this month.`}</p>
+          <button class="rescan-btn" id="rescanBtn" type="button">${ICON_SCAN} Scan another photo</button>
+          ${remaining !== Infinity ? `<div style="margin-top:14px;"><button class="key-toggle" id="resultUpgrade" type="button" style="color:var(--pink);">${ICON_BAG} Get unlimited scans with Pro</button></div>` : ''}
+        </div>
+      </div>
+    </section>
+  `);
+
+  const refineForm = document.getElementById('searchRefine');
+  const refineInput = document.getElementById('searchQueryInput');
+  const applyQuery = () => {
+    const query = refineInput.value.replace(/\s+/g, ' ').trim() || product.searchQuery;
+    document.querySelectorAll('.supplier-card[data-store]').forEach(card => {
+      const store = STORES[card.dataset.store];
+      card.querySelector('[data-store-link]').href = store.search(encodeURIComponent(query));
+      card.querySelector('.sq-text').textContent = query;
+    });
+  };
+  refineInput.addEventListener('input', applyQuery);
+  refineForm.addEventListener('submit', (e) => { e.preventDefault(); applyQuery(); refineInput.blur(); });
+
+  document.getElementById('backHome').addEventListener('click', (e) => { e.preventDefault(); goHome(true); });
+  document.getElementById('rescanBtn').addEventListener('click', () => goHome(true));
+  document.getElementById('resultUpgrade')?.addEventListener('click', () => openUpgradeModal('pro', currentBilling()));
+}
+
+function renderError(message) {
+  setView('error', `
+    <section class="error-view">
+      <div class="wrap fade-in">
+        <div class="error-icon">${ICON_ALERT}</div>
+        <h2>We hit a snag</h2>
+        <p>${escapeHtml(message)}</p>
+        <button class="rescan-btn" id="errorRetryBtn" type="button">${ICON_SCAN} Try again</button>
+      </div>
+    </section>
+  `);
+  // The photo is kept in State so "Try again" comes back with it still loaded.
+  document.getElementById('errorRetryBtn').addEventListener('click', () => goHome(false));
+}
+
+/** clearPhoto=true starts a fresh scan; false keeps the current photo loaded. */
+function goHome(clearPhoto) {
+  if (clearPhoto) State.photo = null;
+  State.product = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderHome();
+}
+
+/* =========================================================================
+   12. GLOBAL LISTENERS + INIT
+   Registered exactly once, so re-rendering the home screen never stacks up
+   duplicate handlers.
+   ========================================================================= */
+const burgerBtn = document.getElementById('burgerBtn');
+const mobileMenu = document.getElementById('mobileMenu');
+
+function closeMobileMenu() {
+  mobileMenu.classList.remove('open');
+  burgerBtn.setAttribute('aria-expanded', 'false');
+}
+
+burgerBtn.addEventListener('click', () => {
+  const open = mobileMenu.classList.toggle('open');
+  burgerBtn.setAttribute('aria-expanded', String(open));
+});
+mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileMenu));
+
+/* Paste an image straight from the clipboard (desktop). */
+document.addEventListener('paste', (e) => {
+  if (State.view !== 'home' || !handlePastedFile) return;
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) {
+        e.preventDefault();
+        handlePastedFile(new File([file], 'pasted-image.png', { type: file.type }));
+      }
+      return;
+    }
+  }
+});
+
+/* The page must never accept a dropped file outside the dropzone — the
+   browser would navigate away from the app to display it. */
+['dragover', 'drop'].forEach(evt =>
+  window.addEventListener(evt, (e) => { e.preventDefault(); }));
+
+/* Modal dismissal: click the backdrop or press Escape. */
+document.getElementById('upgradeModal').addEventListener('click', (e) => {
+  if (e.target.id === 'upgradeModal') closeUpgradeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeUpgradeModal(); closeMobileMenu(); }
+});
+
+/* Never leave the camera running when the tab is hidden or unloaded. */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopCameraStream();
+});
+window.addEventListener('pagehide', stopCameraStream);
+
+/* Init */
+/* Carry over a key saved under the older OpenAI-only storage name. */
+(function migrateStoredKey() {
+  if (store.get(CONFIG.keyStorage)) return;
+  const legacy = store.get('ovf_openai_key');
+  if (legacy) { store.set(CONFIG.keyStorage, legacy); store.remove('ovf_openai_key'); }
+})();
+
+SubscriptionService.load();
+renderHome();
+
+</script>
+</body>
+</html>

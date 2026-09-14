@@ -1,0 +1,14 @@
+# Secrets - never commit. The key goes in Render's dashboard instead.
+.env
+
+# Mac / editor / Python clutter
+.DS_Store
+.vscode/
+__pycache__/
+
+# Old split-file version of the app (still has the removed link mode).
+# Kept on this computer, left out of GitHub. Delete these lines to publish them.
+app.js
+styles.css
+index (3).html
+ai-viral-product-finder.zip
