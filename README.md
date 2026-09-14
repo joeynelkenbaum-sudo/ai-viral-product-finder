@@ -103,7 +103,7 @@ in numbered sections:
 | 2. Utilities | `escapeHtml`, safe `store` wrapper, byte formatting |
 | 3. `ImageIntake` | File/camera → normalized, downscaled JPEG data URL |
 | 4. `IdentifyService` | The vision call — direct to OpenAI, or via your backend |
-| 5. `buildSearchLinks` | Real Amazon/Etsy/Google/Walmart search URLs |
+| 5. `STORES`, `buildSearchLinks` | Live search links on 12 stores; specialists for the product go first |
 | 6. `PLANS`, `SubscriptionService`, `PaymentService` | Plans, metering, checkout |
 | 7. Icons | Inline SVG constants |
 | 8. State + `setView` | The single place screens swap and the camera is torn down |
@@ -134,7 +134,7 @@ Three things are demo-only. Each is isolated to one place:
 3. **Server-side metering** — `SubscriptionService.load()` reads `localStorage`, so users
    can reset their own scan count. Replace it with a fetch to `/api/me`.
 
-Optional: `buildSearchLinks()` returns search URLs rather than invented prices. For actual
+Optional: `buildSearchLinks()` returns search links on 12 stores (Amazon, Google Shopping, Walmart, eBay, Temu, AliExpress, Target, Etsy, Best Buy, Costco, Home Depot, Wayfair) rather than invented prices. For actual
 listings with prices and ratings, plug a shopping API (SerpApi, Rainforest, Amazon PA-API)
 in there.
 

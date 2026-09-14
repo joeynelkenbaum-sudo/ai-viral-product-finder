@@ -825,10 +825,10 @@
   .buy-section-head h3{font-family:var(--font-display);font-size:22px;font-weight:700;}
   .buy-section-head span{color:var(--text-faint);font-size:13px;font-family:var(--font-mono);}
 
-  .supplier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .supplier-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
   .supplier-card{
     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
-    padding:22px;display:flex;flex-direction:column;gap:14px;
+    padding:16px;display:flex;flex-direction:column;gap:10px;
     transition:transform .2s ease, border-color .2s ease;
   }
   .supplier-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,0.4);}
@@ -838,22 +838,28 @@
   }
   .supplier-thumb svg{width:46px;height:46px;color:var(--text-faint);}
   .store-tile{
-    flex-direction:column;gap:10px;
+    height:62px;flex-direction:row;justify-content:flex-start;gap:10px;padding:0 12px;
     background:
       radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--store) 26%, transparent), transparent 70%),
       var(--surface-3);
     border:1px solid color-mix(in srgb, var(--store) 35%, transparent);
   }
   .store-tile .store-mark{
-    width:46px;height:46px;border-radius:12px;
+    width:38px;height:38px;border-radius:10px;flex:none;
+    font-family:var(--font-display);font-weight:800;font-size:15px;letter-spacing:-0.02em;
     display:flex;align-items:center;justify-content:center;
     background:color-mix(in srgb, var(--store) 16%, transparent);
     color:var(--store);
   }
   .store-tile .store-mark svg{width:26px;height:26px;color:var(--store);}
   .store-tile .store-name{
-    font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.04em;
-    color:var(--store);font-weight:600;
+    font-family:var(--font-mono);font-size:12px;letter-spacing:0.02em;
+    color:var(--store);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .store-tile .store-good{
+    margin-left:auto;flex:none;font-family:var(--font-mono);font-size:9.5px;font-weight:600;
+    color:var(--lime);background:rgba(195,255,61,0.1);border:1px solid rgba(195,255,61,0.3);
+    padding:3px 7px;border-radius:100px;white-space:nowrap;
   }
   .view-product-btn{border-color:color-mix(in srgb, var(--store, var(--border)) 40%, transparent);}
   .view-product-btn:hover{
@@ -864,13 +870,13 @@
     position:absolute;top:9px;left:9px;font-family:var(--font-mono);font-size:10px;
     color:var(--text-dim);background:rgba(10,10,18,0.7);padding:4px 8px;border-radius:100px;border:1px solid var(--border);
   }
-  .supplier-card h5{font-size:15px;font-weight:600;line-height:1.35;}
+  .supplier-card h5{font-size:13.5px;font-weight:600;line-height:1.35;}
   .supplier-meta{display:flex;align-items:center;justify-content:space-between;font-size:13px;}
   .supplier-price{font-family:var(--font-mono);font-weight:600;color:var(--lime);font-size:16px;}
   .supplier-rating{display:flex;align-items:center;gap:4px;color:var(--text-dim);}
   .supplier-rating svg{width:13px;height:13px;color:#ffcc4d;}
-  .supplier-ship{color:var(--text-faint);font-size:12.5px;display:flex;align-items:center;gap:6px;}
-  .supplier-ship svg{width:13px;height:13px;}
+  .supplier-ship{color:var(--text-faint);font-size:12.5px;line-height:1.4;display:flex;align-items:flex-start;gap:6px;}
+  .supplier-ship svg{width:13px;height:13px;flex:none;margin-top:2px;}
   .view-product-btn{
     margin-top:auto;
     display:flex;align-items:center;justify-content:center;gap:8px;
@@ -881,8 +887,9 @@
   .view-product-btn:hover{background:var(--grad-viral);border-color:transparent;}
   .view-product-btn svg{width:14px;height:14px;}
 
-  @media (max-width:900px){.supplier-grid{grid-template-columns:1fr 1fr;}}
-  @media (max-width:600px){.supplier-grid{grid-template-columns:1fr;}}
+  @media (max-width:1100px){.supplier-grid{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:820px){.supplier-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:540px){.supplier-grid{grid-template-columns:1fr;}}
 
   .rescan-cta{
     text-align:center;margin-top:52px;padding-top:44px;border-top:1px solid var(--border-soft);
@@ -1790,49 +1797,68 @@ function buildSearchQuery({ searchQuery, name, brand }) {
 }
 
 /**
- * Each store gets its own mark and colour rather than a fourth copy of the
- * user's photo. Real listing thumbnails would need a shopping API and a
- * server — Amazon and Etsy block cross-origin reads from a page like this —
- * so the honest thing is to show whose search you are about to open, and
- * what that particular store is good for.
+ * Where to look for the product. Real listings with photos and prices would
+ * need a shopping API and a server, so each card is a live search on that
+ * store. A store whose speciality matches the product (Best Buy for earbuds,
+ * Wayfair for a lamp) moves to the front and says so.
+ *
+ * Colours are each brand's colour, lightened where needed to read on the dark page.
  */
 const STORES = {
-  amazon: {
-    name: 'Amazon',
-    color: '#FF9900',
-    note: 'Widest selection and the fastest shipping. Best for the mainstream version of this.',
-    search: q => `https://www.amazon.com/s?k=${q}`,
-    mark: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 31c5 4.2 11 6 16 6s11-1.8 16-6" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M35 29.5l5.5 1.2-1.6 5.4" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 22V13a5 5 0 0110 0v9M14 18h10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 22V13" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
-  },
-  etsy: {
-    name: 'Etsy',
-    color: '#F1641E',
-    note: 'Handmade, vintage and small-batch makers. Best if you want a one-of-a-kind version.',
-    search: q => `https://www.etsy.com/search?q=${q}`,
-    mark: `<svg viewBox="0 0 48 48" fill="none"><path d="M17 11h16M17 11v26h17M17 24h12" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M33 33v4" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/></svg>`,
-  },
-  google: {
-    name: 'Google Shopping',
-    color: '#4285F4',
-    note: 'Compares the price across many shops at once. Start here to see who is cheapest.',
-    search: q => `https://www.google.com/search?tbm=shop&q=${q}`,
-    mark: `<svg viewBox="0 0 48 48" fill="none"><path d="M24 12a12 12 0 1011.3 16" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><path d="M24 24h12" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><circle cx="24" cy="24" r="2.6" fill="currentColor"/></svg>`,
-  },
-  walmart: {
-    name: 'Walmart',
-    color: '#0071CE',
-    note: 'Usually the cheaper end, and you can often collect it in a store the same day.',
-    search: q => `https://www.walmart.com/search?q=${q}`,
-    mark: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M24 7v11M24 30v11M9.5 15.5l9.5 5.5M29 27l9.5 5.5M38.5 15.5L29 21M19 27l-9.5 5.5"/></svg>`,
-  },
+  amazon:     { name: 'Amazon',          short: 'a',  color: '#FF9900', note: 'Biggest selection and fast shipping.',
+                search: q => `https://www.amazon.com/s?k=${q}` },
+  google:     { name: 'Google Shopping', short: 'G',  color: '#8AB4F8', note: 'Compares prices across many shops at once.',
+                search: q => `https://www.google.com/search?udm=28&q=${q}` },
+  walmart:    { name: 'Walmart',         short: 'W',  color: '#4DA3FF', note: 'Low prices, often with same-day store pickup.',
+                search: q => `https://www.walmart.com/search?q=${q}` },
+  ebay:       { name: 'eBay',            short: 'e',  color: '#86B817', note: 'New and used — often the cheapest second-hand.',
+                search: q => `https://www.ebay.com/sch/i.html?_nkw=${q}` },
+  temu:       { name: 'Temu',            short: 'Te', color: '#FB7701', note: 'Very low prices; slower shipping from overseas.',
+                search: q => `https://www.temu.com/search_result.html?search_key=${q}`,
+                good: /\b(gadget|accessor|phone case|led|toy|novelty|organizer)/i },
+  aliexpress: { name: 'AliExpress',      short: 'Ae', color: '#FF5A5A', note: 'Factory-direct prices — where many viral gadgets start.',
+                search: q => `https://www.aliexpress.com/wholesale?SearchText=${q}`,
+                good: /\b(gadget|accessor|phone case|led|novelty|organizer)/i },
+  target:     { name: 'Target',          short: 'Ta', color: '#FF6B6B', note: 'Home, beauty and everyday items, with store pickup.',
+                search: q => `https://www.target.com/s?searchTerm=${q}`,
+                good: /\b(beauty|skincare|makeup|baby|kitchen|apparel|clothing)/i },
+  etsy:       { name: 'Etsy',            short: 'E',  color: '#F1641E', note: 'Handmade, vintage and one-of-a-kind versions.',
+                search: q => `https://www.etsy.com/search?q=${q}`,
+                good: /\b(handmade|craft|jewel|vintage|gift|candle|ceramic|personali[sz]ed|art print)/i },
+  bestbuy:    { name: 'Best Buy',        short: 'BB', color: '#FFE000', note: 'Electronics, with in-store help and easy returns.',
+                search: q => `https://www.bestbuy.com/site/searchpage.jsp?st=${q}`,
+                good: /\b(electronic|tech|phone|computer|laptop|tablet|audio|headphone|earbud|airpods|speaker|camera|gaming|console|tv\b|charger|smartwatch)/i },
+  costco:     { name: 'Costco',          short: 'C',  color: '#FF5A6E', note: 'Bulk buys and big-ticket items at member prices.',
+                search: q => `https://www.costco.com/CatalogSearch?dept=All&keyword=${q}`,
+                good: /\b(appliance|mattress|vacuum|grill|bulk|tv\b)/i },
+  homedepot:  { name: 'Home Depot',      short: 'HD', color: '#F96302', note: 'Tools, hardware, garden and home improvement.',
+                search: q => `https://www.homedepot.com/s/${q}`,
+                good: /\b(tool|hardware|garden|outdoor|drill|paint|plumbing|improvement)/i },
+  wayfair:    { name: 'Wayfair',         short: 'Wf', color: '#B98CFF', note: 'Furniture, decor and everything for the home.',
+                search: q => `https://www.wayfair.com/keyword.php?keyword=${q}`,
+                good: /\b(furniture|decor|lighting|lamp|rug|chair|sofa|table|shel(f|ves)|mirror|bedding)/i },
 };
 
-function buildSearchLinks(query) {
+/** Up to this many specialist stores get pulled to the front and labelled. */
+const MAX_GOOD_FOR_THIS = 3;
+
+function buildSearchLinks(query, product) {
   const q = encodeURIComponent(query);
-  return Object.keys(STORES).map(key => {
-    const store = STORES[key];
-    return { key, store: store.name, color: store.color, note: store.note, mark: store.mark, url: store.search(q) };
+  const about = product ? `${product.category || ''} ${product.name || ''}` : '';
+  const links = Object.keys(STORES)
+    .map((key, index) => {
+      const store = STORES[key];
+      const good = !!(about && store.good && store.good.test(about));
+      return { key, index, good, store: store.name, short: store.short, color: store.color, note: store.note, url: store.search(q) };
+    })
+    .sort((a, b) => (b.good - a.good) || (a.index - b.index));
+
+  let labelled = 0;
+  links.forEach(link => {
+    if (link.good && labelled < MAX_GOOD_FOR_THIS) labelled++;
+    else if (link.good) link.good = false;
   });
+  return links;
 }
 
 /* =========================================================================
@@ -2191,8 +2217,8 @@ function renderHome() {
               <div class="ex-icon" style="color:var(--lime)">${ICON_BAG}</div>
               <h4>Buy options</h4>
               <div class="ex-result">
-                <div style="font-size:12.5px;color:var(--text-dim);">Live search · Etsy, Amazon, Walmart</div>
-                <div class="ex-price">4 real store links</div>
+                <div style="font-size:12.5px;color:var(--text-dim);">Live search · Amazon, eBay, Temu and more</div>
+                <div class="ex-price">12 real store links</div>
               </div>
             </div>
           </div>
@@ -2827,7 +2853,7 @@ function sourceBadge(product) {
 
 function renderResult(product) {
   const name = escapeHtml(product.name);
-  const links = buildSearchLinks(product.searchQuery);
+  const links = buildSearchLinks(product.searchQuery, product);
   const remaining = SubscriptionService.remaining();
 
   setView('result', `
@@ -2893,7 +2919,7 @@ function renderResult(product) {
 
         <div class="buy-section-head">
           <h3>Buy / find it</h3>
-          <span>Live search links</span>
+          <span>${links.length} stores · live search links</span>
         </div>
 
         <form class="search-refine" id="searchRefine" novalidate>
@@ -2906,11 +2932,12 @@ function renderResult(product) {
           ${links.map(l => `
             <div class="supplier-card" data-store="${l.key}">
               <div class="supplier-thumb store-tile" style="--store:${l.color};">
-                <span class="store-mark">${l.mark}</span>
+                <span class="store-mark">${l.short}</span>
                 <span class="store-name">${l.store}</span>
+                ${l.good ? '<span class="store-good">Good for this</span>' : ''}
               </div>
               <h5>${l.note}</h5>
-              <span class="supplier-ship">${ICON_SEARCH} Opens a live ${l.store} search for "<span class="sq-text">${escapeHtml(product.searchQuery)}</span>"</span>
+              <span class="supplier-ship">${ICON_SEARCH}<span>Opens a live ${l.store} search for “<span class="sq-text">${escapeHtml(product.searchQuery)}</span>”</span></span>
               <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" class="view-product-btn" data-store-link style="--store:${l.color};">Search ${l.store} ${ICON_EXTERNAL}</a>
             </div>
           `).join('')}
