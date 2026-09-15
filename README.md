@@ -41,13 +41,24 @@ behind those — and the page says so. Use http://localhost:8000.
 
 ## Which AI it uses
 
-| Key the server finds | AI |
-| --- | --- |
-| `OPENAI_API_KEY` | OpenAI `gpt-5.6-luna`, its cheapest current model with image input ($0.20 in / $1.20 out per million tokens, September 2026). Falls back to `gpt-4.1-mini` if the key can't use it. |
-| only `GEMINI_API_KEY` | Google Gemini's free tier, using the best Flash model the key can use |
+| Plan | Scans | AI |
+| --- | --- | --- |
+| Free | 3 a day | Google Gemini (`GEMINI_API_KEY`), picking the best Flash model the key can use |
+| Pro | 20 a day | OpenAI `gpt-5.6-luna` (`OPENAI_API_KEY`), its cheapest current model with image input ($0.20 in / $1.20 out per million tokens, September 2026); falls back to `gpt-4.1-mini` |
+| Business | Unlimited (fair use: 200 a day per visitor, not shown on the page) | Same as Pro |
 
-OpenAI wins when both are set. Change the model with `OPENAI_MODEL`, and how much it
-reasons with `OPENAI_REASONING_EFFORT` (`none`, `low` by default, `medium`, `high`).
+A scan that fails doesn't use up the day's allowance. If one key is missing, that plan uses
+the other AI so the site keeps working. After `OPENAI_DAILY_CAP` OpenAI scans in a day (500
+by default), paid scans switch to Gemini instead of running up the bill. `/api/health`
+shows which AI each plan is using right now.
+
+Change the limits with `FREE_SCANS_PER_DAY`, `PRO_SCANS_PER_DAY` and
+`BUSINESS_SCANS_PER_DAY`, the model with `OPENAI_MODEL`, and how much it reasons with
+`OPENAI_REASONING_EFFORT` (`none`, `low` by default, `medium`, `high`).
+
+**Important while checkout is a demo:** anyone can switch to Pro without paying, and the
+server can't tell who really paid, because there are no accounts yet. The daily limits and
+`OPENAI_DAILY_CAP` are what keep OpenAI costs bounded until real payments exist.
 
 ## How the backend protects your key
 
@@ -56,7 +67,7 @@ reasons with `OPENAI_REASONING_EFFORT` (`none`, `low` by default, `medium`, `hig
 | Key stays server-side | The page only sends the photo or link to `/api/identify`. The key is added by the server. |
 | Nothing else is served | Only the app page and `/api/*` exist. `/.env`, `server.py` and every other file return 404. |
 | Server owns the prompt | Visitors send an image or link, not instructions, so nobody can use your key as a general chatbot. The prompt is read from `IDENTIFY_PROMPT` in the HTML, so there is one copy. |
-| Rate limits | Per visitor: 6 scans/minute, 60/day. Whole site: 1,000/day, so strangers can't run up your bill. Change with `RATE_PER_MINUTE`, `RATE_PER_DAY`, `GLOBAL_PER_DAY`. |
+| Rate limits | Per visitor: 6 scans/minute; 3 a day on Free, 20 on Pro, 200 fair-use on Business. Failed scans are refunded. Whole site: 1,000/day, plus `OPENAI_DAILY_CAP` for OpenAI. Change with `RATE_PER_MINUTE`, `FREE_SCANS_PER_DAY`, `PRO_SCANS_PER_DAY`, `BUSINESS_SCANS_PER_DAY`, `GLOBAL_PER_DAY`. |
 | Size and type checks | JPG, PNG or WEBP only, 6MB maximum. |
 | Busy fallback | When the AI is overloaded or rate-limited, retries once, then moves to the next model. |
 | Link safety | Only public http(s) sites on ports 80/443. Private and internal addresses, and redirects to them, are refused. The rate limit is checked before a link is visited, so the server isn't a free fetching proxy. |
@@ -72,7 +83,7 @@ hosts static files, so it couldn't hide the key), so the code lives on GitHub an
 1. **Code on GitHub.** `.gitignore` keeps `.env` and the old split-file version out.
 2. **Render:** sign up with GitHub, then **New → Blueprint** → this repository. Render reads
    `render.yaml`.
-3. When it asks for keys, paste **`OPENAI_API_KEY`**. `GEMINI_API_KEY` can stay empty.
+3. When it asks for keys, paste both: **`GEMINI_API_KEY`** (Free scans) and **`OPENAI_API_KEY`** (Pro and Business).
 4. Deploy. The site is at `https://ai-viral-product-finder.onrender.com` (or similar).
 
 **Already deployed?** In Render: open the service → **Environment** → add

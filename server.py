@@ -15,12 +15,17 @@ The key:
     Locally, put   OPENAI_API_KEY=your-key   in the .env file next to this script.
     On a host (Render, Railway...), set OPENAI_API_KEY as an environment variable
     in their dashboard instead - never upload the .env file.
-    With no OpenAI key, GEMINI_API_KEY is used instead. OpenAI wins if both are set.
+    Free-plan scans use GEMINI_API_KEY; Pro and Business scans use OPENAI_API_KEY.
+    If one key is missing, the other is used so the site keeps working.
 
 Optional environment variables:
     PORT             port to listen on (hosts set this for you). Default 8000.
     RATE_PER_MINUTE  scans one visitor may run per minute.       Default 6.
-    RATE_PER_DAY     scans one visitor may run per day.          Default 60.
+    FREE_SCANS_PER_DAY   daily scans for a Free visitor.          Default 3.
+    PRO_SCANS_PER_DAY    daily scans for a Pro visitor.           Default 20.
+    BUSINESS_SCANS_PER_DAY  hidden fair-use ceiling on "unlimited" Business.  Default 200.
+    OPENAI_DAILY_CAP     OpenAI scans the whole site may run per day before
+                         paid scans fall back to Gemini.          Default 500.
     GLOBAL_PER_DAY   scans the whole site may run per day.       Default 1000.
                      Caps what strangers can spend on your key.
     OPENAI_MODEL     OpenAI model to use.                         Default gpt-5.6-luna.
@@ -62,7 +67,16 @@ OPENAI_REASONING_EFFORT = os.environ.get("OPENAI_REASONING_EFFORT", "low")
 MAX_IMAGE_BYTES = 6 * 1024 * 1024
 MAX_BODY_BYTES = 9 * 1024 * 1024
 RATE_PER_MINUTE = int(os.environ.get("RATE_PER_MINUTE", "6"))
-RATE_PER_DAY = int(os.environ.get("RATE_PER_DAY", "60"))
+# Daily scans per visitor, by plan. Free scans use Gemini; paid plans use OpenAI.
+FREE_SCANS_PER_DAY = int(os.environ.get("FREE_SCANS_PER_DAY", "3"))
+PRO_SCANS_PER_DAY = int(os.environ.get("PRO_SCANS_PER_DAY", "20"))
+# Business is sold as unlimited. This hidden fair-use ceiling stops one visitor
+# (or a script) spending the OpenAI budget while checkout is still a demo.
+BUSINESS_SCANS_PER_DAY = int(os.environ.get("BUSINESS_SCANS_PER_DAY", "200"))
+PAID_PLANS = ("pro", "business")
+# OpenAI charges per scan. After this many OpenAI scans in a day, paid scans
+# fall back to Gemini instead of running up the bill.
+OPENAI_DAILY_CAP = int(os.environ.get("OPENAI_DAILY_CAP", "500"))
 GLOBAL_PER_DAY = int(os.environ.get("GLOBAL_PER_DAY", "1000"))
 RETRY_PAUSE_SECONDS = float(os.environ.get("RETRY_PAUSE_SECONDS", "1.5"))
 
@@ -107,21 +121,33 @@ def read_env_file():
     return values
 
 
-def ai_provider():
-    """
-    (provider, key), read on every request so adding a key to .env needs no
-    restart. OpenAI wins when both keys are set; ("", "") when neither is.
-    """
+def ai_keys():
+    """Both keys, read on every request so editing .env needs no restart."""
     env = read_env_file()
-    for provider, name in (("openai", "OPENAI_API_KEY"), ("gemini", "GEMINI_API_KEY")):
-        key = (os.environ.get(name) or env.get(name, "")).strip()
-        if key:
-            return provider, key
-    return "", ""
+    return {provider: (os.environ.get(name) or env.get(name, "")).strip()
+            for provider, name in (("openai", "OPENAI_API_KEY"), ("gemini", "GEMINI_API_KEY"))}
+
+
+def normalise_plan(plan):
+    return plan if plan in ("free",) + PAID_PLANS else "free"
+
+
+def ai_for_plan(plan, keys, openai_budget_left=True):
+    """
+    Which AI a scan on this plan uses: paid plans get OpenAI, Free gets Gemini.
+    If that key is missing - or OpenAI's daily budget is spent - the other AI
+    is used so the site keeps working. "" when there is no usable key.
+    """
+    order = ("openai", "gemini") if plan in PAID_PLANS else ("gemini", "openai")
+    for provider in order:
+        if keys.get(provider) and (provider != "openai" or openai_budget_left):
+            return provider
+    return ""
 
 
 def api_key():
-    return ai_provider()[1]
+    keys = ai_keys()
+    return keys["openai"] or keys["gemini"]
 
 
 def load_prompt():
@@ -145,36 +171,91 @@ def load_prompt():
 # --------------------------------------------------------------------------
 
 class RateLimiter:
-    """In-memory limits. Reset when the server restarts, which is fine for this."""
+    """
+    In-memory limits, reset when the server restarts (fine for this).
+
+    The per-minute limit counts every attempt, so failures can't be used to
+    hammer the server. The daily allowance only counts scans that worked: a
+    failed scan is refunded, the same way the page doesn't charge for one.
+    """
 
     def __init__(self):
         self.lock = threading.Lock()
-        self.by_ip = {}
+        self.recent = {}      # ip -> attempt times in the last minute
+        self.today = {}       # ip -> scan times in the last 24 hours
         self.everyone = []
 
-    def check(self, ip):
+    @staticmethod
+    def daily_limit(plan):
+        if plan == "business":
+            return BUSINESS_SCANS_PER_DAY
+        return PRO_SCANS_PER_DAY if plan == "pro" else FREE_SCANS_PER_DAY
+
+    def check(self, ip, plan="free"):
+        """(message, stamp): message is None when allowed; hand stamp to refund() if the scan fails."""
         now = time.time()
-        day_ago = now - 86400
+        day_ago, minute_ago = now - 86400, now - 60
         with self.lock:
             self.everyone = [t for t in self.everyone if t > day_ago]
-            hits = [t for t in self.by_ip.get(ip, []) if t > day_ago]
+            today = [t for t in self.today.get(ip, []) if t > day_ago]
+            recent = [t for t in self.recent.get(ip, []) if t > minute_ago]
 
             if len(self.everyone) >= GLOBAL_PER_DAY:
-                return "This site has reached its scan limit for today. Please try again tomorrow."
-            if len(hits) >= RATE_PER_DAY:
-                return "You've reached today's scan limit. Please try again tomorrow."
-            if len([t for t in hits if t > now - 60]) >= RATE_PER_MINUTE:
-                return "That's a lot of scans in a row. Wait a minute and try again."
+                return "This site has reached its scan limit for today. Please try again tomorrow.", None
+            daily = self.daily_limit(plan)
+            if len(today) >= daily:
+                if plan == "business":
+                    return "You've reached today's fair-use limit. Please try again tomorrow.", None
+                if plan == "pro":
+                    return ("You've used today's %d scans. Upgrade to Business for unlimited scans, "
+                            "or come back tomorrow." % daily), None
+                return ("You've used today's %d free scans. Upgrade to Pro for %d scans a day, "
+                        "or come back tomorrow." % (daily, PRO_SCANS_PER_DAY)), None
+            if len(recent) >= RATE_PER_MINUTE:
+                return "That's a lot of scans in a row. Wait a minute and try again.", None
 
-            hits.append(now)
+            recent.append(now)
+            today.append(now)
             self.everyone.append(now)
-            self.by_ip[ip] = hits
-            for stale_ip in [k for k, v in self.by_ip.items() if not v or v[-1] <= day_ago]:
-                del self.by_ip[stale_ip]
-            return None
+            self.recent[ip], self.today[ip] = recent, today
+            for table, cutoff in ((self.recent, minute_ago), (self.today, day_ago)):
+                for stale_ip in [k for k, v in table.items() if not v or v[-1] <= cutoff]:
+                    del table[stale_ip]
+            return None, now
+
+    def refund(self, ip, stamp):
+        """Give back the day's scan for a request that failed. Its per-minute attempt still counts."""
+        if stamp is None:
+            return
+        with self.lock:
+            if stamp in self.today.get(ip, []):
+                self.today[ip].remove(stamp)
+            if stamp in self.everyone:
+                self.everyone.remove(stamp)
 
 
 LIMITER = RateLimiter()
+
+
+class DailyCounter:
+    """How many times something happened in the last 24 hours."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.times = []
+
+    def count(self):
+        with self.lock:
+            cutoff = time.time() - 86400
+            self.times = [t for t in self.times if t > cutoff]
+            return len(self.times)
+
+    def add(self):
+        with self.lock:
+            self.times.append(time.time())
+
+
+OPENAI_SCANS = DailyCounter()
 
 
 # --------------------------------------------------------------------------
@@ -756,8 +837,11 @@ class Handler(BaseHTTPRequestHandler):
             with open(APP_FILE, "rb") as handle:
                 self.send(200, handle.read(), "text/html; charset=utf-8")
         elif path == "/api/health":
-            provider, key = ai_provider()
-            self.send_json(200, {"ok": True, "keyConfigured": bool(key), "provider": provider or None})
+            keys = ai_keys()
+            budget_left = OPENAI_SCANS.count() < OPENAI_DAILY_CAP
+            plans = {plan: ai_for_plan(plan, keys, budget_left) or None for plan in ("free",) + PAID_PLANS}
+            self.send_json(200, {"ok": True, "keyConfigured": bool(keys["openai"] or keys["gemini"]),
+                                 "provider": plans["pro"], "plans": plans})
         else:
             self.send(404, "Not found", "text/plain; charset=utf-8")
 
@@ -792,11 +876,11 @@ class Handler(BaseHTTPRequestHandler):
         if length > MAX_BODY_BYTES:
             raise ClientError(413, "That photo is too large. Please use one under 6MB.")
 
-        provider, key = ai_provider()
-        if not key:
+        keys = ai_keys()
+        if not (keys["openai"] or keys["gemini"]):
             where = "in the host's Environment settings" if "PORT" in os.environ else "to the .env file"
             raise ClientError(503, "The server has no AI key yet. The site owner needs to add "
-                                   "OPENAI_API_KEY %s." % where)
+                                   "GEMINI_API_KEY and OPENAI_API_KEY %s." % where)
 
         try:
             body = json.loads(self.rfile.read(length))
@@ -807,18 +891,35 @@ class Handler(BaseHTTPRequestHandler):
         if not image and not link:
             raise ClientError(400, "Send a photo or a link.")
 
+        # The plan comes from the visitor's browser. Until there are real accounts
+        # and payments it can't be verified, so the per-visitor daily limit and
+        # OPENAI_DAILY_CAP are what actually bound the cost.
+        plan = normalise_plan(body.get("plan"))
+
         # Checked before any link is visited, so the server can't be used as a
         # free web-fetching proxy either.
-        limited = LIMITER.check(self.client_ip())
+        ip = self.client_ip()
+        limited, stamp = LIMITER.check(ip, plan)
         if limited:
             raise ClientError(429, limited)
 
-        if image:
-            return identify(image, key, provider=provider)
+        try:
+            provider = ai_for_plan(plan, keys, OPENAI_SCANS.count() < OPENAI_DAILY_CAP)
+            if not provider:
+                raise ClientError(503, "Today's AI budget for this site is used up. Please try again tomorrow.")
+            source = None
+            if not image:
+                image, source = link_to_image(link)
+            product = identify(image, keys[provider], context=(source or {}).get("title", ""), provider=provider)
+        except Exception:
+            LIMITER.refund(ip, stamp)   # a scan that didn't work doesn't use up the day's allowance
+            raise
 
-        image, source = link_to_image(link)
-        product = identify(image, key, context=source.get("title", ""), provider=provider)
-        product["source"] = dict(source, image=image)
+        if provider == "openai":
+            OPENAI_SCANS.add()          # count what was actually used against the daily budget
+        product["ai"] = provider
+        if source:
+            product["source"] = dict(source, image=image)
         return product
 
 
@@ -844,16 +945,16 @@ def main():
         print("\n  AI Viral Product Finder is running on port %d" % port)
     else:
         print("\n  AI Viral Product Finder is running at %s" % url)
-    provider, _ = ai_provider()
-    if provider == "openai":
-        print("  AI: OpenAI %s (key kept on the server, never sent to browsers)" % OPENAI_MODEL)
-    elif provider == "gemini":
-        print("  AI: Google Gemini (key kept on the server). Add OPENAI_API_KEY to use OpenAI instead.")
-    elif on_a_host:
-        print("  AI key: MISSING - set OPENAI_API_KEY in your host's Environment settings")
-    else:
-        print("  AI key: MISSING - add OPENAI_API_KEY=your-key to the .env file")
-        print("          (no restart needed after you save it)")
+    keys = ai_keys()
+    names = {"openai": "OpenAI %s" % OPENAI_MODEL, "gemini": "Google Gemini", "": "NO AI KEY"}
+    print("  Free plan scans:     %s (%d a day)" % (names[ai_for_plan("free", keys)], FREE_SCANS_PER_DAY))
+    print("  Pro/Business scans:  %s (Pro %d a day, Business unlimited up to %d)"
+          % (names[ai_for_plan("pro", keys)], PRO_SCANS_PER_DAY, BUSINESS_SCANS_PER_DAY))
+    missing = [name for provider, name in (("gemini", "GEMINI_API_KEY"), ("openai", "OPENAI_API_KEY")) if not keys[provider]]
+    if missing:
+        where = "your host's Environment settings" if on_a_host else "the .env file (no restart needed)"
+        print("  Missing: %s - add to %s" % (", ".join(missing), where))
+    print("  Keys stay on the server and are never sent to browsers.")
     print("  Press Ctrl+C to stop.\n")
 
     if not on_a_host and not os.environ.get("NO_BROWSER"):

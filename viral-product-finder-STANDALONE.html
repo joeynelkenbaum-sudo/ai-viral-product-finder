@@ -1384,6 +1384,7 @@ const IdentifyService = {
       notSureAbout: parsed.notSureAbout || '',
       brand: GENERIC_BRANDS.test(String(parsed.brand || '')) ? '' : (parsed.brand || ''),
       searchQuery: buildSearchQuery(parsed),
+      ai: parsed.ai === 'openai' || parsed.ai === 'gemini' ? parsed.ai : '',
       image,
     };
   },
@@ -1397,7 +1398,7 @@ const IdentifyService = {
     onStep(0, total, LINK_STEPS[0]);
 
     // Start the request now; step through the progress UI while it runs.
-    const settled = this._postBackend({ url }).then(value => ({ value }), error => ({ error }));
+    const settled = this._postBackend({ url, plan: SubscriptionService.state.plan }).then(value => ({ value }), error => ({ error }));
     await sleep(700);
     onStep(1, total, LINK_STEPS[1]);
     await sleep(700);
@@ -1427,7 +1428,7 @@ const IdentifyService = {
 
   /** Preferred path once you have a server. Key never reaches the browser. */
   async _viaBackend(imageDataUrl) {
-    const data = await this._postBackend({ image: imageDataUrl });
+    const data = await this._postBackend({ image: imageDataUrl, plan: SubscriptionService.state.plan });
     return typeof data === 'string' ? data : JSON.stringify(data);
   },
 
@@ -1871,29 +1872,30 @@ const PLANS = {
     id: 'free', name: 'Free', tagline: 'Try it out and see what it can do.',
     priceMonthly: 0, priceYearly: 0, scanLimit: 3,
     features: [
-      { text: '3 photo scans per month', on: true },
-      { text: 'AI product identification', on: true },
-      { text: 'Search links to major stores', on: true },
+      { text: '3 scans per day', on: true },
+      { text: 'AI identification with Google Gemini', on: true },
+      { text: 'Search links to 12 stores', on: true },
       { text: 'Scan history', on: false },
-      { text: 'Priority AI model (GPT-4o)', on: false },
+      { text: 'ChatGPT (OpenAI) identification', on: false },
     ],
   },
   pro: {
     id: 'pro', name: 'Pro', tagline: 'For people who find things constantly.',
-    priceMonthly: 9, priceYearly: 79, scanLimit: Infinity, featured: true,
+    priceMonthly: 9, priceYearly: 79, scanLimit: 20, featured: true,
     features: [
-      { text: 'Unlimited photo scans', on: true },
-      { text: 'AI product identification', on: true },
-      { text: 'Search links to major stores', on: true },
+      { text: '20 scans per day', on: true },
+      { text: 'AI identification with ChatGPT (OpenAI)', on: true },
+      { text: 'Search links to 12 stores', on: true },
       { text: 'Full scan history', on: true },
-      { text: 'Priority AI model (GPT-4o)', on: true },
     ],
   },
   business: {
     id: 'business', name: 'Business', tagline: 'For resellers and sourcing teams.',
+    // Unlimited here; server.py still applies a fair-use ceiling per visitor.
     priceMonthly: 29, priceYearly: 279, scanLimit: Infinity,
     features: [
       { text: 'Everything in Pro', on: true },
+      { text: 'Unlimited scans (fair use)', on: true },
       { text: 'Bulk photo scanning', on: true },
       { text: 'Supplier price comparison', on: true },
       { text: 'CSV export', on: true },
@@ -1902,30 +1904,37 @@ const PLANS = {
   },
 };
 
+/** Today on this device, YYYY-MM-DD. The scan allowance resets when it changes. */
+function localDay(date = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 const SubscriptionService = {
-  state: { plan: 'free', scansUsed: 0, periodStart: null, billing: 'monthly' },
+  state: { plan: 'free', scansUsed: 0, day: null, billing: 'monthly' },
 
   /* REAL INTEGRATION: replace with `this.state = await (await fetch('/api/me')).json()`
-     so plan and usage live server-side and cannot be edited in devtools. */
+     so plan and usage live server-side and cannot be edited in devtools. Until
+     then server.py applies its own per-visitor daily limit. */
   load() {
     const raw = store.get(CONFIG.subStorage);
     if (raw) {
-      try { this.state = { ...this.state, ...JSON.parse(raw) }; } catch {}
+      try { this.state = { plan: 'free', scansUsed: 0, day: null, billing: 'monthly', ...JSON.parse(raw) }; } catch {}
     }
     if (!PLANS[this.state.plan]) this.state.plan = 'free';
     if (typeof this.state.scansUsed !== 'number' || this.state.scansUsed < 0) this.state.scansUsed = 0;
-    if (!this.state.periodStart) this.state.periodStart = Date.now();
+    delete this.state.periodStart;   // left over from the old monthly allowance
     this.rolloverIfNeeded();
     return this.state;
   },
 
   save() { store.set(CONFIG.subStorage, JSON.stringify(this.state)); },
 
-  /** Resets the monthly allowance after 30 days. */
+  /** Scans are a daily allowance: a new day starts from zero. */
   rolloverIfNeeded() {
-    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-    if (Date.now() - this.state.periodStart > THIRTY_DAYS) {
-      this.state.periodStart = Date.now();
+    const today = localDay();
+    if (this.state.day !== today) {
+      this.state.day = today;
       this.state.scansUsed = 0;
       this.save();
     }
@@ -1934,33 +1943,30 @@ const SubscriptionService = {
   plan() { return PLANS[this.state.plan] || PLANS.free; },
   limit() { return this.plan().scanLimit; },
   remaining() {
-    const lim = this.limit();
-    return lim === Infinity ? Infinity : Math.max(0, lim - this.state.scansUsed);
+    this.rolloverIfNeeded();
+    return Math.max(0, this.limit() - this.state.scansUsed);
   },
   canScan() { return this.remaining() > 0; },
 
-  /** Only called after a scan actually succeeds — failures never cost a credit. */
+  /** Only called after a scan actually succeeds — failures never cost a scan. */
   recordScan() {
-    if (this.limit() !== Infinity) {
-      this.state.scansUsed += 1;
-      this.save();
-    }
+    this.rolloverIfNeeded();
+    this.state.scansUsed += 1;
+    this.save();
     renderUsagePill();
   },
 
+  /* Changing plan keeps today's count: upgrading raises the limit rather than
+     handing out a fresh allowance, so switching plans back and forth gains nothing. */
   setPlan(planId, billing) {
     this.state.plan = planId;
     this.state.billing = billing || this.state.billing;
-    this.state.scansUsed = 0;
-    this.state.periodStart = Date.now();
     this.save();
     renderUsagePill();
   },
 
   cancel() {
     this.state.plan = 'free';
-    this.state.scansUsed = 0;
-    this.state.periodStart = Date.now();
     this.save();
     renderUsagePill();
   },
@@ -2231,7 +2237,7 @@ function renderHome() {
         <div class="section-head">
           <span class="section-eyebrow">Pricing</span>
           <h2 class="section-title">Start free, upgrade when you're hooked</h2>
-          <p class="section-desc">Every plan includes real AI identification. Cancel anytime.</p>
+          <p class="section-desc">Free scans use Google Gemini. Pro and Business use ChatGPT. Cancel anytime.</p>
         </div>
         <div style="text-align:center;">
           <div class="billing-toggle" id="billingToggle">
@@ -2304,10 +2310,10 @@ function openUpgradeModal(planId, billing, outOfScans) {
   const overlay = document.getElementById('upgradeModal');
   const body = document.getElementById('modalBody');
 
-  const title = outOfScans ? "You've used your free scans" : 'Upgrade your plan';
+  const title = outOfScans ? "You've used today's free scans" : 'Upgrade your plan';
   const desc = outOfScans
-    ? `You've used all ${PLANS.free.scanLimit} scans on the Free plan this month. Upgrade for unlimited product identification.`
-    : 'Pick a plan and get unlimited scans right away.';
+    ? `You've used all ${PLANS.free.scanLimit} free scans for today. Upgrade to Pro for ${PLANS.pro.scanLimit} scans a day, identified by ChatGPT.`
+    : `${PLANS.pro.scanLimit} scans a day on Pro, or unlimited on Business, identified by ChatGPT.`;
 
   body.innerHTML = `
     <button class="modal-close" id="modalClose" type="button" aria-label="Close">${ICON_CLOSE}</button>
@@ -2366,7 +2372,7 @@ function showUpgradeSuccess(planId) {
     <button class="modal-close" id="modalClose" type="button" aria-label="Close">${ICON_CLOSE}</button>
     <div class="modal-icon" style="background:rgba(195,255,61,0.12);">${ICON_CHECK}</div>
     <h3 id="modalTitle">You're on ${PLANS[planId].name}</h3>
-    <p>Unlimited scans are unlocked. Go find something good.</p>
+    <p>${planId === 'business' ? 'Unlimited scans' : `${PLANS[planId].scanLimit} scans a day`} with ChatGPT are unlocked. Go find something good.</p>
     <button class="modal-cta" id="modalDone" type="button">${ICON_SCAN} Start scanning</button>
   `;
   document.getElementById('modalClose').addEventListener('click', closeUpgradeModal);
@@ -2381,7 +2387,18 @@ function closeUpgradeModal() {
   document.getElementById('upgradeModal').classList.remove('open');
 }
 
-/** Nav pill showing plan + scans remaining. */
+/**
+ * True when today's scans are used up, after explaining it: Free gets the
+ * upgrade offer, paid plans are told when the allowance resets.
+ */
+function scanLimitReached(showError) {
+  if (SubscriptionService.canScan()) return false;
+  if (SubscriptionService.plan().id === 'free') openUpgradeModal('pro', currentBilling(), true);
+  else showError(`You've used today's ${SubscriptionService.limit()} scans. They reset tomorrow, or switch to Business for unlimited scans.`);
+  return true;
+}
+
+/** Nav pill showing plan + scans remaining today. */
 function renderUsagePill() {
   const pill = document.getElementById('usagePill');
   if (!pill) return;
@@ -2390,8 +2407,8 @@ function renderUsagePill() {
   const isPaid = plan.id !== 'free';
   pill.className = `usage-pill${isPaid ? ' pro' : ''}`;
   pill.innerHTML = isPaid
-    ? `<span class="plan-dot"></span><b>${plan.name}</b> · Unlimited`
-    : `<span class="plan-dot"></span><b>${remaining}</b> of ${plan.scanLimit} scans left`;
+    ? `<span class="plan-dot"></span><b>${plan.name}</b> · ${remaining === Infinity ? 'Unlimited' : `${remaining} of ${plan.scanLimit} today`}`
+    : `<span class="plan-dot"></span><b>${remaining}</b> of ${plan.scanLimit} scans left today`;
 }
 
 /* =========================================================================
@@ -2693,10 +2710,7 @@ function bindHomeEvents() {
       store.set(CONFIG.keyStorage, key);
     }
 
-    if (!SubscriptionService.canScan()) {
-      openUpgradeModal('pro', currentBilling(), true);
-      return;
-    }
+    if (scanLimitReached(showError)) return;
 
     clearError();
     startScan(State.photo, key);
@@ -2719,10 +2733,7 @@ function bindHomeEvents() {
       showError('Scanning a link needs the app server. Open the app at its Render address.');
       return;
     }
-    if (!SubscriptionService.canScan()) {
-      openUpgradeModal('pro', currentBilling(), true);
-      return;
-    }
+    if (scanLimitReached(showError)) return;
     clearError();
     State.lastLink = link;
     startLinkScan(link);
@@ -2873,6 +2884,7 @@ function renderResult(product) {
             <div>
               <span class="conf-badge">${ICON_CHECK} ${product.confidence}% match confidence</span>
               <span class="cat-tag">${escapeHtml(product.category)}</span>
+              ${product.ai ? `<span class="cat-tag">· AI: ${product.ai === 'openai' ? 'ChatGPT' : 'Gemini'}</span>` : ''}
             </div>
             <h1 class="result-title">${name}</h1>
             <p class="result-desc">${escapeHtml(product.description)}</p>
@@ -2944,11 +2956,9 @@ function renderResult(product) {
         </div>
 
         <div class="rescan-cta">
-          <p>${remaining === Infinity
-              ? 'Spotted something else worth finding?'
-              : `You have <b style="color:var(--lime)">${remaining}</b> free ${remaining === 1 ? 'scan' : 'scans'} left this month.`}</p>
+          <p>${remaining === Infinity ? 'Unlimited scans on Business.' : `You have <b style="color:var(--lime)">${remaining}</b> ${remaining === 1 ? 'scan' : 'scans'} left today.`}</p>
           <button class="rescan-btn" id="rescanBtn" type="button">${ICON_SCAN} Scan another photo</button>
-          ${remaining !== Infinity ? `<div style="margin-top:14px;"><button class="key-toggle" id="resultUpgrade" type="button" style="color:var(--pink);">${ICON_BAG} Get unlimited scans with Pro</button></div>` : ''}
+          ${SubscriptionService.plan().id === 'free' ? `<div style="margin-top:14px;"><button class="key-toggle" id="resultUpgrade" type="button" style="color:var(--pink);">${ICON_BAG} Get ${PLANS.pro.scanLimit} scans a day with ChatGPT on Pro</button></div>` : ''}
         </div>
       </div>
     </section>

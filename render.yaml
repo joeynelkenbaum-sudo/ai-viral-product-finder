@@ -1,6 +1,7 @@
 # Render reads this file to create the web service from GitHub.
 # The API keys are NOT here: Render asks for them when you create the service
-# and keeps them secret. Fill in OPENAI_API_KEY; GEMINI_API_KEY is only a backup.
+# and keeps them secret. Free-plan scans use GEMINI_API_KEY; Pro and Business use
+# OPENAI_API_KEY. Set both.
 services:
   - type: web
     name: ai-viral-product-finder
